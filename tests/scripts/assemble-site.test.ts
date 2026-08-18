@@ -67,6 +67,9 @@ describe('assemble-site', () => {
     const redirects = readFileSync(join(dir, 'dist/_redirects'), 'utf8')
     expect(redirects).toContain('/console            /console/             301')
     expect(redirects).toContain('/console/*          /console/index.html   200')
+    // The two links a Game Master pastes into a chat window resolve to the app shell.
+    expect(redirects).toContain('/s/*                /console/index.html   200')
+    expect(redirects).toContain('/p/*                /console/index.html   200')
     expect(redirects).toContain('/docs               /docs/                301')
     expect(redirects).toMatch(/\/docs\/fight\/effects\/\s+\/docs\/guides\/effects\/\s+301/)
     // A first-layout URL whose slug moved across two reorganisations still lands in one hop.
@@ -81,6 +84,13 @@ describe('assemble-site', () => {
     // Not at the root: the marketing site keeps its own, or every unknown URL there
     // would answer with the console.
     expect(readFileSync(join(dir, 'dist/404.html'), 'utf8')).not.toContain('app')
+  })
+
+  it('answers a shared link from inside its own root, not from the site`s', () => {
+    // Same mechanism as the console's, scoped to the two shared paths. Without these a
+    // pasted /s/<code> lands on the marketing site's 404 page and the encounter is lost.
+    expect(readFileSync(join(dir, 'dist/s/404.html'), 'utf8')).toContain('app')
+    expect(readFileSync(join(dir, 'dist/p/404.html'), 'utf8')).toContain('app')
   })
 
   it('overwrites the sitemap index to cover both the site and the handbook', () => {

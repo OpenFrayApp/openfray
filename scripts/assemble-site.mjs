@@ -6,7 +6,7 @@
 // site/dist, and Starlight builds the handbook into docs/dist (base = /docs/). This
 // step copies each into the dist root and writes the Pages routing rules. Output
 // dir for Pages is dist/.
-import { copyFileSync, cpSync, writeFileSync, rmSync } from 'node:fs'
+import { copyFileSync, cpSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 
 // Site root (/) → the Astro-built marketing site (home, privacy, terms, 404).
 cpSync('site/dist', 'dist', { recursive: true })
@@ -74,6 +74,12 @@ const docsMoves = {
 const redirects = [
   '/console            /console/             301',
   '/console/*          /console/index.html   200',
+  // The two surfaces a Game Master hands to someone else: /p/<code> is the table's
+  // read-only player board, /s/<code> is a published encounter. They sit at the domain
+  // root rather than under /console because they are pasted into a chat window, and the
+  // app reads the code off the path either way.
+  '/s/*                /console/index.html   200',
+  '/p/*                /console/index.html   200',
   '/docs               /docs/                301',
   ...Object.entries(docsMoves).map(([from, to]) => `${from.padEnd(38)}${to}  301`),
   '',
@@ -88,6 +94,17 @@ writeFileSync('dist/_redirects', redirects)
 // the fallback is what the feature relies on. It has to be inside dist/console: at the
 // root it would swallow every unknown path on the marketing site too.
 copyFileSync('dist/console/index.html', 'dist/console/404.html')
+
+// And the same shell under each shared root. On Pages the splat rules above are what
+// serve /s/<code> and /p/<code>; these copies cover everything that reads dist/ without
+// applying _redirects, which is any static preview of the assembled output. Each one is
+// scoped to its own directory, which is what makes it safe: a root-level 404.html would
+// swallow every unknown path on the marketing site, including the ones the site's own
+// 404 page is for.
+for (const root of ['s', 'p']) {
+  mkdirSync(`dist/${root}`, { recursive: true })
+  copyFileSync('dist/console/index.html', `dist/${root}/404.html`)
+}
 
 // One sitemap index at the domain root, covering both the marketing site and the
 // handbook. Each part builds its own sitemap-0.xml (@astrojs/sitemap); the docs are a
