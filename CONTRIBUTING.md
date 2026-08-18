@@ -105,9 +105,7 @@ that proves the links _between_ the parts resolve.
    covers the handbook, the marketing site, and the app's own labels and messages.
 7. **Sign your commits (DCO).** Use `git commit -s`, which adds a `Signed-off-by:`
    line certifying you have the right to submit the code under the project's
-   license. Commits are authored by you, a person. Don't add AI co-author
-   trailers (`Co-Authored-By: Claude …`) or "Generated with …" lines, whatever
-   tools you used along the way.
+   license.
 
 ## Reporting bugs
 
