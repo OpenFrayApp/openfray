@@ -131,6 +131,6 @@ agents alike.
 
 ## Supporting
 
-OpenFray is free and ad-free. If it saves you time at the table and you'd like to
-help cover hosting, donations are welcome (link TBD), but the app stays fully
-free regardless.
+The OpenFray console is free and ad-free. If it saves you time at the table and
+you'd like to help cover hosting, donations are welcome (link TBD), but the
+console stays fully free regardless.

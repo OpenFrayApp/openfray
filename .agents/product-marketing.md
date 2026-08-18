@@ -24,8 +24,11 @@ devices.
 **Product type:** free web app, open source (AGPL-3.0), a project by Nicola
 Mustone; no company behind it.
 
-**Business model:** free and ad-free, no paid tier. Donations welcome eventually
-(link TBD); the app stays fully free regardless.
+**Business model:** the console is free and ad-free, with no paid tier, and stays
+that way; so does everything OpenFray publishes as a free library. Donations
+welcome eventually (link TBD). Scope every claim to the console or to the
+published material by name — "OpenFray is free" is the shape to avoid, because it
+speaks for the whole project rather than for the product it describes.
 
 ## Target Audience
 
@@ -110,7 +113,7 @@ flexible, and forgets everything; nothing is shared with players.
 - **Content included.** Basic Rules 2024 and 2014, four Kobold Press libraries,
   and three original books published free — over 2000 creatures, plus a full
   homebrew editor and a D&D Beyond importer extension.
-- **Open source (AGPL)**, ad-free, free.
+- **The console is open source (AGPL)**, ad-free, and free.
 
 **Why customers choose us:** the fight runs itself forward; the GM keeps the
 judgment and loses the bookkeeping.
@@ -122,7 +125,7 @@ judgment and loses the bookkeeping.
 | "Another app at the table." | It's a browser tab. Nothing installs, no account for the first fight, and it's built for a table with real dice and real books still on it. |
 | "I already have a VTT." | Keep it for the map. OpenFray does not do maps and will not; run the battlefield wherever you like and leave the fight to us. |
 | "Will it stick around? Where's my data?" | Open source under AGPL; anonymous mode stores nothing anywhere; signed-in data sits in your account and the code to run your own is public. |
-| "Really free?" | Free, ad-free, no tier. Donations optional, someday. |
+| "Really free?" | The console is free and ad-free, with no tier, and stays that way. Donations optional, someday. |
 
 **Anti-personas:** tables that want one integrated platform where the character
 sheets drive the combat automation; players looking for a character sheet manager
