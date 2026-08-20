@@ -6,7 +6,7 @@
 // site/dist, and Starlight builds the handbook into docs/dist (base = /docs/). This
 // step copies each into the dist root and writes the Pages routing rules. Output
 // dir for Pages is dist/.
-import { copyFileSync, cpSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { copyFileSync, cpSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 
 // Site root (/) → the Astro-built marketing site (home, privacy, terms, 404).
 cpSync('site/dist', 'dist', { recursive: true })
@@ -95,15 +95,53 @@ writeFileSync('dist/_redirects', redirects)
 // root it would swallow every unknown path on the marketing site too.
 copyFileSync('dist/console/index.html', 'dist/console/404.html')
 
-// And the same shell under each shared root. On Pages the splat rules above are what
-// serve /s/<code> and /p/<code>; these copies cover everything that reads dist/ without
-// applying _redirects, which is any static preview of the assembled output. Each one is
-// scoped to its own directory, which is what makes it safe: a root-level 404.html would
-// swallow every unknown path on the marketing site, including the ones the site's own
-// 404 page is for.
-for (const root of ['s', 'p']) {
+// And the same shell under each shared root, which is what actually answers /s/<code>
+// and /p/<code>. Each one is scoped to its own directory, which is what makes it safe: a
+// root-level 404.html would swallow every unknown path on the marketing site, including
+// the ones the site's own 404 page is for.
+//
+// The shell it copies describes the console, because that is the page it usually is. On
+// these two it is not, and the tags are what a chat window reads when somebody pastes the
+// link: without this, every shared encounter unfurls as "Combat console" pointing at
+// /console/, which is neither the page nor its address. So each copy gets its own.
+//
+// The description says nothing about the encounter behind the code. The tags are the same
+// for every link under a prefix, because a link scanner that follows one into a chat log
+// should learn no more than the person who was sent it chose to say.
+const SHARED_SHELLS = {
+  s: {
+    title: 'A shared encounter — OpenFray',
+    description:
+      'Someone shared a Dungeons and Dragons 5e encounter with you. Open it to read the ' +
+      'creatures, or add it to your own board.',
+  },
+  p: {
+    title: 'Player view — OpenFray',
+    description:
+      'A live, read-only view of the fight your Game Master is running. It shows what they ' +
+      'choose to show.',
+  },
+}
+
+/** The shell again, saying which of the two surfaces it is rather than which app it is. */
+function sharedShell(html, root, { title, description }) {
+  const url = `https://openfray.app/${root}/`
+  return html
+    .replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
+    .replace(
+      /(<meta\s+(?:name|property)="(?:description|og:title|og:description|og:url|twitter:title|twitter:description)"[^>]*content=")[^"]*(")/g,
+      (whole, open, close) => {
+        if (whole.includes('og:url')) return `${open}${url}${close}`
+        if (whole.includes('title')) return `${open}${title}${close}`
+        return `${open}${description}${close}`
+      },
+    )
+}
+
+const shell = readFileSync('dist/console/index.html', 'utf8')
+for (const [root, meta] of Object.entries(SHARED_SHELLS)) {
   mkdirSync(`dist/${root}`, { recursive: true })
-  copyFileSync('dist/console/index.html', `dist/${root}/404.html`)
+  writeFileSync(`dist/${root}/404.html`, sharedShell(shell, root, meta))
 }
 
 // One sitemap index at the domain root, covering both the marketing site and the

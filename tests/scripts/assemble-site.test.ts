@@ -33,7 +33,20 @@ beforeEach(() => {
   file('site/dist/lab/loop.mp4', 'mp4')
   file('site/dist/sitemap-index.xml', '<sitemapindex>site-only</sitemapindex>')
   file('docs/dist/index.html', '<html>docs</html>')
-  file('console/dist/console/index.html', '<html>app</html>')
+  file(
+    'console/dist/console/index.html',
+    [
+      '<html><head><title>Combat console — OpenFray</title>',
+      '<meta name="description" content="the console" />',
+      '<meta property="og:title" content="Combat console — OpenFray" />',
+      '<meta property="og:description" content="the console" />',
+      '<meta property="og:url" content="https://openfray.app/console/" />',
+      '<meta property="og:image" content="https://openfray.app/console/og-image.png" />',
+      '<meta name="twitter:title" content="Combat console — OpenFray" />',
+      '<meta name="twitter:description" content="the console" />',
+      '</head><body>app</body></html>',
+    ].join(''),
+  )
   execFileSync('node', [SCRIPT], { cwd: dir, stdio: 'pipe' })
 })
 
@@ -91,6 +104,34 @@ describe('assemble-site', () => {
     // pasted /s/<code> lands on the marketing site's 404 page and the encounter is lost.
     expect(readFileSync(join(dir, 'dist/s/404.html'), 'utf8')).toContain('app')
     expect(readFileSync(join(dir, 'dist/p/404.html'), 'utf8')).toContain('app')
+  })
+
+  it('tells a chat window which page a shared link is, and where it lives', () => {
+    // The shell describes the console, because that is the page it usually is. Pasted into
+    // a chat, these two are not, and nothing else gets a chance to say so: an unfurl reads
+    // the tags and never runs the app.
+    const shared = readFileSync(join(dir, 'dist/s/404.html'), 'utf8')
+    expect(shared).toContain('<title>A shared encounter — OpenFray</title>')
+    expect(shared).toContain('content="https://openfray.app/s/"')
+    expect(shared).not.toContain('Combat console')
+    expect(shared).not.toContain('openfray.app/console/"')
+
+    const player = readFileSync(join(dir, 'dist/p/404.html'), 'utf8')
+    expect(player).toContain('<title>Player view — OpenFray</title>')
+    expect(player).toContain('content="https://openfray.app/p/"')
+  })
+
+  it('says nothing about the encounter behind the code', () => {
+    // Every link under a prefix carries the same words. A scanner that follows one out of a
+    // chat log learns no more than the person who was sent it chose to say.
+    const shared = readFileSync(join(dir, 'dist/s/404.html'), 'utf8')
+    expect(shared).toContain('Someone shared a Dungeons and Dragons 5e encounter with you')
+    // The image is the app's own and is left alone: it names nothing.
+    expect(shared).toContain('og-image.png')
+  })
+
+  it('leaves the console`s own shell describing the console', () => {
+    expect(readFileSync(join(dir, 'dist/console/404.html'), 'utf8')).toContain('Combat console')
   })
 
   it('overwrites the sitemap index to cover both the site and the handbook', () => {
