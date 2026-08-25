@@ -42,6 +42,7 @@ beforeEach(() => {
       '<meta property="og:description" content="the console" />',
       '<meta property="og:url" content="https://openfray.app/console/" />',
       '<meta property="og:image" content="https://openfray.app/console/og-image.png" />',
+      '<meta property="og:image:alt" content="OpenFray — a DnD 5e combat console for Game Masters" />',
       '<meta name="twitter:title" content="Combat console — OpenFray" />',
       '<meta name="twitter:description" content="the console" />',
       '<meta name="twitter:image" content="https://openfray.app/console/og-image.png" />',
@@ -51,6 +52,10 @@ beforeEach(() => {
   file(
     'console/dist/console/compendium/srd-creatures.json',
     JSON.stringify([{ id: 'srd-5.2:goblin', name: 'Goblin', size: 'Small', type: 'humanoid' }]),
+  )
+  file(
+    'console/dist/console/compendium/srd-spells.json',
+    JSON.stringify([{ id: 'srd-5.2:fireball' }]),
   )
   execFileSync('node', [SCRIPT], { cwd: dir, stdio: 'pipe' })
 })
@@ -84,6 +89,8 @@ describe('assemble-site', () => {
       readFileSync(join(dir, 'dist/console/compendium/srd-creatures.index.json'), 'utf8'),
     )
     expect(index['srd-5.2:goblin']).toEqual({ name: 'Goblin', size: 'Small', type: 'humanoid' })
+    // Spells are never on a card, so a book of them gets no sidecar.
+    expect(existsSync(join(dir, 'dist/console/compendium/srd-spells.index.json'))).toBe(false)
   })
 
   it('removes /lab, the section-component demo, assets included', () => {
@@ -169,6 +176,24 @@ describe('assemble-site', () => {
     // the domain rather than the console the link doesn't go to.
     expect(shared).toContain('content="https://openfray.app/og-image.png"')
     expect(shared).not.toContain('/console/og-image.png')
+  })
+
+  // The alt text sat outside the image rewrite's pattern, which ends at a closing quote and
+  // so never matched `og:image:alt`. Both shared shells described a picture neither shows.
+  it('describes the picture the card actually carries', () => {
+    const shared = readFileSync(join(dir, 'dist/s/index.html'), 'utf8')
+    expect(shared).toContain(
+      '<meta property="og:image:alt" content="OpenFray — a DnD 5e combat console for Game Masters" />',
+    )
+  })
+
+  // Discord tints its embed's accent bar from this, so the chrome frames the card the
+  // Function paints. The player view has no card to frame and keeps the console's shell.
+  it('gives the shared-encounter shell the brand accent, and not the player view', () => {
+    expect(readFileSync(join(dir, 'dist/s/index.html'), 'utf8')).toContain(
+      '<meta name="theme-color" content="#6366f1" />',
+    )
+    expect(readFileSync(join(dir, 'dist/p/index.html'), 'utf8')).not.toContain('theme-color')
   })
 
   it('leaves the console`s own shell describing the console', () => {

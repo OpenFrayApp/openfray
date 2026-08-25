@@ -12,10 +12,11 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   writeFileSync,
   rmSync,
 } from 'node:fs'
-import { writeCompendiumIndexes } from './compendium-index.mjs'
+import { CREATURES_SUFFIX, indexCreatures, indexFileFor } from './compendium-index.mjs'
 
 // Site root (/) → the Astro-built marketing site (home, privacy, terms, 404).
 cpSync('site/dist', 'dist', { recursive: true })
@@ -28,7 +29,14 @@ cpSync('console/dist/console', 'dist/console', { recursive: true })
 // card can name `srd-5.2:goblin` without parsing the book it lives in. Written here rather
 // than committed because it is derived: a CR corrected in the compendium repo would
 // otherwise desync from a checked-in copy of it.
-if (existsSync('dist/console/compendium')) writeCompendiumIndexes('dist/console/compendium')
+const COMPENDIUM = 'dist/console/compendium'
+if (existsSync(COMPENDIUM)) {
+  for (const file of readdirSync(COMPENDIUM)) {
+    if (!file.endsWith(CREATURES_SUFFIX)) continue
+    const creatures = JSON.parse(readFileSync(`${COMPENDIUM}/${file}`, 'utf8'))
+    writeFileSync(`${COMPENDIUM}/${indexFileFor(file)}`, JSON.stringify(indexCreatures(creatures)))
+  }
+}
 
 // The print edition lives under src/pages so it renders through the site's own
 // components, but it is a local tool for saving a PDF and never ships.
@@ -135,21 +143,35 @@ copyFileSync('dist/console/index.html', 'dist/console/404.html')
 // link: without this, every shared encounter unfurls as "Combat console" pointing at
 // /console/, which is neither the page nor its address. So each copy gets its own.
 //
-// The description says nothing about the encounter behind the code. The tags are the same
-// for every link under a prefix, because a link scanner that follows one into a chat log
-// should learn no more than the person who was sent it chose to say.
+// These are the fallback: what a link says about itself when no Function decorates it.
+// `functions/s/[code].ts` swaps in per-share tags at the edge, and this is what stays if it
+// is ever removed or fails to deploy.
+//
+// The tags here are the same for every link under a prefix, and once the HTML is written
+// per request that stops being a fact of the build and becomes a choice. The choice made:
+// name, cast and byline yes, the note no. A scanner holding the URL has already spent the
+// 49 bits an unlisted link's privacy is made of, and what a targeted card adds is that it
+// no longer has to render a JS app to triage the code. The note is the one field where a
+// scanner would learn what the reader was sent rather than what the publisher chose to
+// publish, so it never reaches a tag. `noindex` on both prefixes keeps them out of search
+// either way.
 const SHARED_SHELLS = {
   s: {
     title: 'A shared encounter — OpenFray',
     description:
       'Someone shared a Dungeons and Dragons 5e encounter with you. Open it to read the ' +
       'creatures, or add it to your own board.',
+    alt: 'OpenFray — a DnD 5e combat console for Game Masters',
+    // Discord tints its embed's left accent bar from this, so the chrome frames the card
+    // the Function paints instead of fighting it. The player view has no card to frame.
+    themeColor: '#6366f1',
   },
   p: {
     title: 'Player view — OpenFray',
     description:
       'A live, read-only view of the fight your Game Master is running. It shows what they ' +
       'choose to show.',
+    alt: 'OpenFray — a DnD 5e combat console for Game Masters',
   },
 }
 
@@ -159,9 +181,9 @@ const SHARED_SHELLS = {
 const BANNER = 'https://openfray.app/og-image.png'
 
 /** The shell again, saying which of the two surfaces it is rather than which app it is. */
-function sharedShell(html, root, { title, description }) {
+function sharedShell(html, root, { title, description, alt, themeColor }) {
   const url = `https://openfray.app/${root}/`
-  return html
+  const withTags = html
     .replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
     .replace(
       /(<meta\s+(?:name|property)="(?:description|og:title|og:description|og:url|twitter:title|twitter:description)"[^>]*content=")[^"]*(")/g,
@@ -171,10 +193,19 @@ function sharedShell(html, root, { title, description }) {
         return `${open}${description}${close}`
       },
     )
+    // `og:image:alt` is matched here rather than with the two image URLs, whose pattern ends
+    // at the closing quote and so never touched it: both shared shells carried the console's
+    // alt text describing a picture neither of them shows.
+    .replace(/(<meta\s+property="og:image:alt"[^>]*content=")[^"]*(")/, `$1${alt}$2`)
     .replace(
       /(<meta\s+(?:name|property)="(?:og:image|twitter:image)"[^>]*content=")[^"]*(")/g,
       `$1${BANNER}$2`,
     )
+  if (!themeColor) return withTags
+  return withTags.replace(
+    /<title>/,
+    `<meta name="theme-color" content="${themeColor}" />\n    <title>`,
+  )
 }
 
 const shell = readFileSync('dist/console/index.html', 'utf8')

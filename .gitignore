@@ -4,6 +4,10 @@
 .env
 .env.*
 !.env.example
+# Runtime variables for `wrangler pages dev`, the Pages project's own settings locally.
+.dev.vars
+.dev.vars.*
+.wrangler/
 *.local
 
 # ───────────────────────────────────────────────────────────────

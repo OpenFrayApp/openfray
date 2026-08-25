@@ -1,37 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Nicola Mustone
 
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-// @ts-expect-error — a plain build script, deliberately untyped.
-import {
-  indexCreatures,
-  indexFileFor,
-  writeCompendiumIndexes,
-} from '../../scripts/compendium-index.mjs'
+import { describe, expect, it } from 'vitest'
+import { indexCreatures, indexFileFor } from '../../scripts/compendium-index.mjs'
 
 const COMPENDIUM = resolve(__dirname, '../../console/public/compendium')
-let dir: string
-
-beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'compendium-'))
-})
-afterEach(() => rmSync(dir, { recursive: true, force: true }))
-
-/** One library file in the fixture folder. */
-function library(name: string, creatures: unknown[]): void {
-  writeFileSync(join(dir, name), JSON.stringify(creatures))
-}
 
 describe('compendium-index', () => {
   it('keeps only what a card can say, and drops what a card never reads', () => {
@@ -65,18 +40,6 @@ describe('compendium-index', () => {
     const index = indexCreatures([{ id: 'x:y', name: 'Y', size: 'Tiny', type: 'ooze' }])
     expect(index['x:y']).toEqual({ name: 'Y', size: 'Tiny', type: 'ooze' })
     expect('cr' in index['x:y']).toBe(false)
-  })
-
-  it('writes one sidecar per library of stat blocks, and none for a book of spells', () => {
-    library('srd-creatures.json', [
-      { id: 'srd-5.2:goblin', name: 'Goblin', size: 'Small', type: 'humanoid' },
-    ])
-    library('srd-spells.json', [{ id: 'srd-5.2:fireball', name: 'Fireball' }])
-    const written = writeCompendiumIndexes(dir)
-    expect(written).toEqual(['srd-creatures.index.json'])
-    expect(existsSync(join(dir, 'srd-spells.index.json'))).toBe(false)
-    const index = JSON.parse(readFileSync(join(dir, 'srd-creatures.index.json'), 'utf8'))
-    expect(index['srd-5.2:goblin'].name).toBe('Goblin')
   })
 
   it('names the sidecar after the library it sits beside', () => {
