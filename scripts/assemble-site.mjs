@@ -6,7 +6,16 @@
 // site/dist, and Starlight builds the handbook into docs/dist (base = /docs/). This
 // step copies each into the dist root and writes the Pages routing rules. Output
 // dir for Pages is dist/.
-import { copyFileSync, cpSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  rmSync,
+} from 'node:fs'
+import { writeCompendiumIndexes } from './compendium-index.mjs'
 
 // Site root (/) → the Astro-built marketing site (home, privacy, terms, 404).
 cpSync('site/dist', 'dist', { recursive: true })
@@ -14,6 +23,12 @@ cpSync('site/dist', 'dist', { recursive: true })
 // /console → the Vite-built app. The console workspace builds into its own
 // dist/console so the base path survives; copy it under the same path here.
 cpSync('console/dist/console', 'dist/console', { recursive: true })
+
+// A sidecar index beside each library of stat blocks, so the Function that draws a share
+// card can name `srd-5.2:goblin` without parsing the book it lives in. Written here rather
+// than committed because it is derived: a CR corrected in the compendium repo would
+// otherwise desync from a checked-in copy of it.
+if (existsSync('dist/console/compendium')) writeCompendiumIndexes('dist/console/compendium')
 
 // The print edition lives under src/pages so it renders through the site's own
 // components, but it is a local tool for saving a PDF and never ships.

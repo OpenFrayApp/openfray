@@ -48,6 +48,10 @@ beforeEach(() => {
       '</head><body>app</body></html>',
     ].join(''),
   )
+  file(
+    'console/dist/console/compendium/srd-creatures.json',
+    JSON.stringify([{ id: 'srd-5.2:goblin', name: 'Goblin', size: 'Small', type: 'humanoid' }]),
+  )
   execFileSync('node', [SCRIPT], { cwd: dir, stdio: 'pipe' })
 })
 
@@ -71,6 +75,15 @@ describe('assemble-site', () => {
       expect(existsSync(join(dir, `dist/${book}/print`))).toBe(false)
       expect(existsSync(join(dir, `dist/${book}/index.html`))).toBe(true)
     }
+  })
+
+  // The Function that draws a share card reads these, and nothing else does. Generated
+  // here rather than committed, so a corrected CR can't desync from a checked-in copy.
+  it('writes a sidecar index beside every library of stat blocks', () => {
+    const index = JSON.parse(
+      readFileSync(join(dir, 'dist/console/compendium/srd-creatures.index.json'), 'utf8'),
+    )
+    expect(index['srd-5.2:goblin']).toEqual({ name: 'Goblin', size: 'Small', type: 'humanoid' })
   })
 
   it('removes /lab, the section-component demo, assets included', () => {
