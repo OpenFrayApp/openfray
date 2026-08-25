@@ -46,13 +46,15 @@ Three parts ship as **one site**. Each is its own repo under
 `scripts/assemble-site.mjs` merges their builds into `dist/` for Cloudflare Pages.
 This parent repo owns the deploy and the shared docs.
 
-| Folder (submodule)           | Repo                  | What it is                                          | Served at  |
-| ---------------------------- | --------------------- | --------------------------------------------------- | ---------- |
-| `console/`                   | `OpenFrayApp/console` | the React + Vite combat console                     | `/console` |
-| `site/`                      | `OpenFrayApp/site`    | Astro marketing site, plus the published libraries  | `/`        |
-| `docs/`                      | `OpenFrayApp/docs`    | Starlight handbook for players and GMs              | `/docs`    |
-| `console/public/compendium/` | —                     | generated SRD / Tome of Beasts JSON the app fetches | —          |
-| `local/`                     | —                     | maintainer working notes, **not committed**         | —          |
+| Folder (submodule)           | Repo                  | What it is                                              | Served at  |
+| ---------------------------- | --------------------- | ------------------------------------------------------- | ---------- |
+| `console/`                   | `OpenFrayApp/console` | the React + Vite combat console                         | `/console` |
+| `site/`                      | `OpenFrayApp/site`    | Astro marketing site, plus the published libraries      | `/`        |
+| `docs/`                      | `OpenFrayApp/docs`    | Starlight handbook for players and GMs                  | `/docs`    |
+| `console/public/compendium/` | —                     | generated SRD / Tome of Beasts JSON the app fetches     | —          |
+| `functions/`                 | —                     | Pages Functions: the card a shared link unfurls with    | `/s/*`     |
+| `share-card/`                | —                     | what a share says about itself, read by those Functions | —          |
+| `local/`                     | —                     | maintainer working notes, **not committed**             | —          |
 
 Day to day, each part is worked on as its own standalone clone (the site needs a
 `console` clone beside it). Clone this repo with `git clone --recurse-submodules` to
@@ -64,6 +66,24 @@ Each part documents itself: the console's AGENTS.md holds the scope principle in
 full, the architectural rules, and the build order; the site's holds the book
 sources, the print edition, and the styling rules; the docs repo's holds the
 screenshot pipeline. `STYLE.md` here governs the copy in all of them.
+
+### Pages Functions
+
+`functions/` holds the only server-side code in the project: `s/[code].ts` swaps per-share
+meta tags into the shared shell, and `s/[code]/og.png.ts` draws the picture behind them.
+Four things about them.
+
+- **They live at the project root and are compiled separately from `dist/`.**
+  `assemble-site.mjs` must never copy them.
+- **They read `SUPABASE_URL` and `SUPABASE_ANON_KEY` as runtime variables** in the Pages
+  project settings. The `VITE_`-prefixed build variables are baked into the client bundle
+  and a Function never sees them. When every card falls back to the site banner, check
+  this first: a Function reading `undefined` degrades silently, on purpose.
+- **`wrangler pages dev dist` is the only place a routing bug shows up.** A 200 rewrite
+  Pages has rejected is reported nowhere else. Run it after any change to `_redirects` or
+  to a Function, and read the output for "Infinite loop detected in this rule".
+- **Their tests are this repo's**, in `tests/share-card/`, beside the deploy-script tests.
+  Set `.dev.vars` at the root for a local run; it is gitignored.
 
 ### Workspaces & dev servers
 
