@@ -38,6 +38,13 @@ if (existsSync(COMPENDIUM)) {
   }
 }
 
+// The typeface the share cards are drawn in. Satori needs real font files and cannot read
+// the system stack the brand banner names, so Inter stands in for it. Served as static
+// assets rather than compiled into the Worker: the Function fetches the weights it needs
+// through env.ASSETS. `LICENSE.txt` travels with them because the SIL Open Font License
+// asks that it does.
+cpSync('brand/fonts', 'dist/fonts', { recursive: true })
+
 // The print edition lives under src/pages so it renders through the site's own
 // components, but it is a local tool for saving a PDF and never ships.
 rmSync('dist/the-waking-garden/print', { recursive: true, force: true })

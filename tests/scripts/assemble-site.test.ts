@@ -33,6 +33,8 @@ beforeEach(() => {
   file('site/dist/lab/loop.mp4', 'mp4')
   file('site/dist/sitemap-index.xml', '<sitemapindex>site-only</sitemapindex>')
   file('docs/dist/index.html', '<html>docs</html>')
+  file('brand/fonts/inter-500.ttf', 'ttf')
+  file('brand/fonts/LICENSE.txt', 'the SIL Open Font License')
   file(
     'console/dist/console/index.html',
     [
@@ -91,6 +93,13 @@ describe('assemble-site', () => {
     expect(index['srd-5.2:goblin']).toEqual({ name: 'Goblin', size: 'Small', type: 'humanoid' })
     // Spells are never on a card, so a book of them gets no sidecar.
     expect(existsSync(join(dir, 'dist/console/compendium/srd-spells.index.json'))).toBe(false)
+  })
+
+  // Satori draws the share cards and needs real font files. They are served as assets, and
+  // the licence travels with them because the SIL Open Font License asks that it does.
+  it('serves the card typeface, licence included', () => {
+    expect(readFileSync(join(dir, 'dist/fonts/inter-500.ttf'), 'utf8')).toBe('ttf')
+    expect(existsSync(join(dir, 'dist/fonts/LICENSE.txt'))).toBe(true)
   })
 
   it('removes /lab, the section-component demo, assets included', () => {

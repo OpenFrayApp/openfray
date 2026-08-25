@@ -13,6 +13,7 @@ import {
   type CreatureCard,
   type EncounterCard,
 } from '../../share-card/card.ts'
+import { BYLINE_MAX } from '../../console/src/lib/byline.ts'
 
 const ambush: EncounterCard = {
   kind: 'encounter',
@@ -62,11 +63,13 @@ describe('the shared card', () => {
     expect(licenseLabel(undefined)).toBeUndefined()
   })
 
+  // The form and the parser both stop at BYLINE_MAX, so this only ever fires on a row
+  // written straight into the database. The licence has to survive whatever was typed.
   it('cuts a byline rather than letting it push the licence off the line', () => {
     expect(clipByline('  Nicola Mustone  ')).toBe('Nicola Mustone')
     expect(clipByline('')).toBeUndefined()
     const long = clipByline('a'.repeat(60))
-    expect(long).toHaveLength(40)
+    expect(long).toHaveLength(BYLINE_MAX)
     expect(long?.endsWith('…')).toBe(true)
   })
 

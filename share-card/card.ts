@@ -3,6 +3,7 @@
 
 import { formatCr, titleCase } from '../console/src/compendium/format.ts'
 import { LICENSE_LABELS, type ContentLicense } from '../console/src/schema/license.ts'
+import { BYLINE_MAX } from '../console/src/lib/byline.ts'
 
 /**
  * What a `/s/<code>` link says about itself before anyone opens it.
@@ -47,16 +48,17 @@ export interface CreatureCard {
 export type ShareCard = EncounterCard | CreatureCard
 
 /**
- * A byline as it is printed. Long enough for a name and a handle, and cut rather than
- * allowed to push the licence off the end of the line it shares.
+ * Cut a byline to what the card's footer holds, marking the cut.
+ *
+ * The publish form and the parser both hold a byline to `BYLINE_MAX`, so this never fires on
+ * anything published through the console. It is here for a row written straight into the
+ * database, which `lib/byline.ts` says plainly is possible: the licence has to stay visible
+ * whatever somebody typed.
  */
-export const BYLINE_CHARS = 40
-
-/** Cut a byline to what the card's footer holds, marking the cut. */
 export function clipByline(by: string | undefined): string | undefined {
   const text = by?.trim()
   if (!text) return undefined
-  return text.length <= BYLINE_CHARS ? text : `${text.slice(0, BYLINE_CHARS - 1).trimEnd()}…`
+  return text.length <= BYLINE_MAX ? text : `${text.slice(0, BYLINE_MAX - 1).trimEnd()}…`
 }
 
 /**
