@@ -79,6 +79,19 @@ describe('describeShare', () => {
     })
   })
 
+  // Pages hands a Function every variable the project declares, and the `VITE_` prefix is
+  // only Vite's instruction about what to bake into the client bundle. Reading both spellings
+  // means the card works off the pair the console already declares.
+  it('finds its credentials under the prefixed names too', async () => {
+    const env = envWith(encounter, {
+      SUPABASE_URL: undefined,
+      SUPABASE_ANON_KEY: undefined,
+      VITE_SUPABASE_URL: 'https://db.example',
+      VITE_SUPABASE_ANON_KEY: 'anon',
+    })
+    expect(await describeShare(env, CODE, ORIGIN)).toMatchObject({ name: 'Ambush at the ford' })
+  })
+
   it('reads only the sidecars the cast names, never the books themselves', async () => {
     await describeShare(envWith(encounter), CODE, ORIGIN)
     expect(assetPaths).toEqual(['/console/compendium/srd-creatures.index.json'])
@@ -175,6 +188,12 @@ describe('describeShare', () => {
         encounter,
         CODE,
         { SUPABASE_URL: undefined, SUPABASE_ANON_KEY: undefined },
+      ],
+      [
+        'a project carrying only half a credential',
+        encounter,
+        CODE,
+        { SUPABASE_ANON_KEY: undefined },
       ],
     ])('returns null for %s', async (_case, row, code, overrides) => {
       expect(await describeShare(envWith(row, overrides), String(code), ORIGIN)).toBeNull()

@@ -75,10 +75,11 @@ Four things about them.
 
 - **They live at the project root and are compiled separately from `dist/`.**
   `assemble-site.mjs` must never copy them.
-- **They read `SUPABASE_URL` and `SUPABASE_ANON_KEY` as runtime variables** in the Pages
-  project settings. The `VITE_`-prefixed build variables are baked into the client bundle
-  and a Function never sees them. When every card falls back to the site banner, check
-  this first: a Function reading `undefined` degrades silently, on purpose.
+- **They read the project's Supabase URL and anon key**, under either the plain or the
+  `VITE_`-prefixed name. Pages hands a Function every variable the project declares; the
+  prefix is only Vite's instruction about what to bake into the client bundle. When every
+  card falls back to the site banner, check the variables first: a Function reading
+  `undefined` degrades silently, on purpose.
 - **`wrangler pages dev dist` is the only place a routing bug shows up.** A 200 rewrite
   Pages has rejected is reported nowhere else. Run it after any change to `_redirects` or
   to a Function, and read the output for "Infinite loop detected in this rule".

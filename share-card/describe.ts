@@ -19,15 +19,28 @@ import type { CastChip, ShareCard } from './card.ts'
  * fails to unfurl rather than one that unfurls plainly.
  */
 
-/** What the Function is handed: the runtime variables, and the asset server. */
+/**
+ * What the Function is handed: the project's environment variables, and the asset server.
+ *
+ * Both spellings are read. Pages hands a Function every variable the project declares,
+ * whatever it is called, and the `VITE_` prefix is only Vite's instruction about which ones
+ * to bake into the client bundle at build time. The console already declares the prefixed
+ * pair, so reading either means the card works without a second copy of the same two values
+ * sitting in the project settings waiting to disagree with the first.
+ */
 export interface CardEnv {
-  /**
-   * Runtime environment variables in the Pages project, not the `VITE_`-prefixed build ones.
-   * Those are baked into the client bundle and a Function never sees them.
-   */
   SUPABASE_URL?: string
   SUPABASE_ANON_KEY?: string
+  VITE_SUPABASE_URL?: string
+  VITE_SUPABASE_ANON_KEY?: string
   ASSETS: { fetch(input: RequestInfo | URL): Promise<Response> }
+}
+
+/** The project's Supabase credentials under either name, or null if neither is set. */
+function credentials(env: CardEnv): { url: string; key: string } | null {
+  const url = env.SUPABASE_URL || env.VITE_SUPABASE_URL
+  const key = env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY
+  return url && key ? { url, key } : null
 }
 
 /**
@@ -39,13 +52,14 @@ async function readShare(
   env: CardEnv,
   code: string,
 ): Promise<{ kind: string; data: unknown } | null> {
-  if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return null
-  const response = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/share`, {
+  const supabase = credentials(env)
+  if (!supabase) return null
+  const response = await fetch(`${supabase.url}/rest/v1/rpc/share`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      apikey: env.SUPABASE_ANON_KEY,
-      authorization: `Bearer ${env.SUPABASE_ANON_KEY}`,
+      apikey: supabase.key,
+      authorization: `Bearer ${supabase.key}`,
     },
     body: JSON.stringify({ want: code }),
   })
