@@ -44,6 +44,7 @@ beforeEach(() => {
       '<meta property="og:image" content="https://openfray.app/console/og-image.png" />',
       '<meta name="twitter:title" content="Combat console — OpenFray" />',
       '<meta name="twitter:description" content="the console" />',
+      '<meta name="twitter:image" content="https://openfray.app/console/og-image.png" />',
       '</head><body>app</body></html>',
     ].join(''),
   )
@@ -76,13 +77,14 @@ describe('assemble-site', () => {
     expect(existsSync(join(dir, 'dist/lab'))).toBe(false)
   })
 
-  it('writes the Pages redirects: slash normalisation, SPA fallback, moved docs URLs', () => {
+  it('writes the Pages redirects: slash normalisation, code rewrites, moved docs URLs', () => {
     const redirects = readFileSync(join(dir, 'dist/_redirects'), 'utf8')
     expect(redirects).toContain('/console            /console/             301')
-    expect(redirects).toContain('/console/*          /console/index.html   200')
-    // The two links a Game Master pastes into a chat window resolve to the app shell.
-    expect(redirects).toContain('/s/*                /console/index.html   200')
-    expect(redirects).toContain('/p/*                /console/index.html   200')
+    // The two links a Game Master pastes into a chat window resolve to their own shell,
+    // and answer 200 doing it.
+    expect(redirects).toContain('/s/*                /s/                   200')
+    expect(redirects).toContain('/p/*                /p/                   200')
+    expect(redirects).toContain('/console/play/*     /console/             200')
     expect(redirects).toContain('/docs               /docs/                301')
     expect(redirects).toMatch(/\/docs\/fight\/effects\/\s+\/docs\/guides\/effects\/\s+301/)
     // A first-layout URL whose slug moved across two reorganisations still lands in one hop.
@@ -90,8 +92,29 @@ describe('assemble-site', () => {
     expect(redirects.endsWith('\n')).toBe(true)
   })
 
-  // Deep links into the app — /console/play/<code> — are answered by the closest
-  // 404.html rather than by the _redirects proxy, which has never fired on Pages.
+  // Pages drops a rewrite whose destination ends in `.html` or `/index` as an infinite
+  // loop against its own extension stripping, and says so nowhere but `wrangler pages
+  // dev`. That is what kept /s/<code> answering 404 from launch until 2026-08-25.
+  it('never points a 200 rewrite at an .html file', () => {
+    const rewrites = readFileSync(join(dir, 'dist/_redirects'), 'utf8')
+      .split('\n')
+      .filter((line) => line.trim().endsWith('200'))
+    expect(rewrites.length).toBeGreaterThan(0)
+    for (const rule of rewrites) {
+      const [, to] = rule.trim().split(/\s+/)
+      expect(to).not.toMatch(/\.html$|\/index$/)
+    }
+  })
+
+  // A rewrite is followed whether or not an asset matches the request, so one covering
+  // /console/* would answer every script under /console/assets/ with the app shell.
+  it('rewrites no prefix that holds real files', () => {
+    const redirects = readFileSync(join(dir, 'dist/_redirects'), 'utf8')
+    expect(redirects).not.toContain('/console/*')
+  })
+
+  // Deep links into the app that no rewrite can cover are answered by the closest
+  // 404.html: the page renders, and the status stays 404.
   it('leaves the app shell as the console`s own 404 page', () => {
     expect(readFileSync(join(dir, 'dist/console/404.html'), 'utf8')).toContain('app')
     // Not at the root: the marketing site keeps its own, or every unknown URL there
@@ -100,23 +123,26 @@ describe('assemble-site', () => {
   })
 
   it('answers a shared link from inside its own root, not from the site`s', () => {
-    // Same mechanism as the console's, scoped to the two shared paths. Without these a
-    // pasted /s/<code> lands on the marketing site's 404 page and the encounter is lost.
-    expect(readFileSync(join(dir, 'dist/s/404.html'), 'utf8')).toContain('app')
-    expect(readFileSync(join(dir, 'dist/p/404.html'), 'utf8')).toContain('app')
+    // index.html is what the rewrite serves, and 404.html the same file again, in case
+    // the rewrite is ever dropped: without either, a pasted /s/<code> lands on the
+    // marketing site's 404 page and the encounter is lost.
+    for (const root of ['s', 'p']) {
+      expect(readFileSync(join(dir, `dist/${root}/index.html`), 'utf8')).toContain('app')
+      expect(readFileSync(join(dir, `dist/${root}/404.html`), 'utf8')).toContain('app')
+    }
   })
 
   it('tells a chat window which page a shared link is, and where it lives', () => {
     // The shell describes the console, because that is the page it usually is. Pasted into
     // a chat, these two are not, and nothing else gets a chance to say so: an unfurl reads
     // the tags and never runs the app.
-    const shared = readFileSync(join(dir, 'dist/s/404.html'), 'utf8')
+    const shared = readFileSync(join(dir, 'dist/s/index.html'), 'utf8')
     expect(shared).toContain('<title>A shared encounter — OpenFray</title>')
     expect(shared).toContain('content="https://openfray.app/s/"')
     expect(shared).not.toContain('Combat console')
     expect(shared).not.toContain('openfray.app/console/"')
 
-    const player = readFileSync(join(dir, 'dist/p/404.html'), 'utf8')
+    const player = readFileSync(join(dir, 'dist/p/index.html'), 'utf8')
     expect(player).toContain('<title>Player view — OpenFray</title>')
     expect(player).toContain('content="https://openfray.app/p/"')
   })
@@ -124,10 +150,12 @@ describe('assemble-site', () => {
   it('says nothing about the encounter behind the code', () => {
     // Every link under a prefix carries the same words. A scanner that follows one out of a
     // chat log learns no more than the person who was sent it chose to say.
-    const shared = readFileSync(join(dir, 'dist/s/404.html'), 'utf8')
+    const shared = readFileSync(join(dir, 'dist/s/index.html'), 'utf8')
     expect(shared).toContain('Someone shared a Dungeons and Dragons 5e encounter with you')
-    // The image is the app's own and is left alone: it names nothing.
-    expect(shared).toContain('og-image.png')
+    // The card's picture is the site's banner: it names nothing, and its address line is
+    // the domain rather than the console the link doesn't go to.
+    expect(shared).toContain('content="https://openfray.app/og-image.png"')
+    expect(shared).not.toContain('/console/og-image.png')
   })
 
   it('leaves the console`s own shell describing the console', () => {

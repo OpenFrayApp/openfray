@@ -67,19 +67,34 @@ const docsMoves = {
 }
 
 // Pages routing: normalise the bare /console and /docs to their trailing-slash index,
-// and give the app an SPA-style fallback so any /console/* path resolves to the app
-// shell (real static assets under /console/ are served first, so this only catches
-// unknown paths). The docs are fully static, so they need no fallback. The site root
-// is left to dist/index.html.
+// and rewrite the paths that carry a code in the URL onto the app shell, so they answer
+// 200 instead of falling through to a 404 page. The docs are fully static, so they need
+// no fallback. The site root is left to dist/index.html.
+//
+// Two rules govern a 200 rewrite here, and breaking either one is silent:
+//
+//   - The destination may not end in `.html` or `/index`. Pages strips those from a URL
+//     of its own accord, reads the rule as a loop against that stripping, and drops it
+//     ("Infinite loop detected in this rule and has been ignored", which only
+//     `wrangler pages dev` ever prints). `/s/* → /console/index.html` was ignored from
+//     launch until 2026-08-25 for this reason, and every /s/<code> answered 404.
+//   - The source may only cover a prefix that holds no real files. A rewrite is followed
+//     whether or not an asset matches, so `/console/* → /console/` would answer every
+//     script under /console/assets/ with the shell. That is why the app's own deep links
+//     rely on dist/console/404.html below, and only the code-carrying prefixes are
+//     rewritten.
 const redirects = [
   '/console            /console/             301',
-  '/console/*          /console/index.html   200',
   // The two surfaces a Game Master hands to someone else: /p/<code> is the table's
   // read-only player board, /s/<code> is a published encounter. They sit at the domain
   // root rather than under /console because they are pasted into a chat window, and the
-  // app reads the code off the path either way.
-  '/s/*                /console/index.html   200',
-  '/p/*                /console/index.html   200',
+  // app reads the code off the path either way. Each rewrites onto its own shell, which
+  // is what lets the two describe themselves to whatever unfurls the link.
+  '/s/*                /s/                   200',
+  '/p/*                /p/                   200',
+  // The app's own player-view path, from before the shared roots existed. Nothing but
+  // the code sits under it, so it can be rewritten too.
+  '/console/play/*     /console/             200',
   '/docs               /docs/                301',
   ...Object.entries(docsMoves).map(([from, to]) => `${from.padEnd(38)}${to}  301`),
   '',
@@ -87,16 +102,16 @@ const redirects = [
 writeFileSync('dist/_redirects', redirects)
 
 // The app shell again as the console's own 404 page. Pages looks for the closest
-// `404.html` from the requested path upward, so this is what actually answers a deep
-// link like /console/play/<code>: the shell loads and `main.tsx` reads the path. The
-// `_redirects` proxy above is the rule that ought to do it — it has been in the file
-// since launch and has never fired on a splat, while every 301 beside it works — so
-// the fallback is what the feature relies on. It has to be inside dist/console: at the
-// root it would swallow every unknown path on the marketing site too.
+// `404.html` from the requested path upward, so this answers any other deep link into
+// the app, which no rewrite can cover while real assets live under /console/. The page
+// renders and `main.tsx` reads the path, but the status stays 404, so a link worth
+// pasting into a chat belongs under /s/ or /p/. It has to be inside dist/console: at
+// the root it would swallow every unknown path on the marketing site too.
 copyFileSync('dist/console/index.html', 'dist/console/404.html')
 
-// And the same shell under each shared root, which is what actually answers /s/<code>
-// and /p/<code>. Each one is scoped to its own directory, which is what makes it safe: a
+// And the same shell under each shared root, as the rewrite's destination. Each also
+// stays as that root's 404 page, which is what answers /s/<code> if the rewrite is ever
+// dropped again. Both are scoped to their own directory, which is what makes them safe: a
 // root-level 404.html would swallow every unknown path on the marketing site, including
 // the ones the site's own 404 page is for.
 //
@@ -123,6 +138,11 @@ const SHARED_SHELLS = {
   },
 }
 
+// The card's picture is the site's banner, not the console's. They are the same drawing
+// apart from the address along the bottom, and the console's reads openfray.app/console,
+// which is not where either of these links goes. It names nothing about the encounter.
+const BANNER = 'https://openfray.app/og-image.png'
+
 /** The shell again, saying which of the two surfaces it is rather than which app it is. */
 function sharedShell(html, root, { title, description }) {
   const url = `https://openfray.app/${root}/`
@@ -136,12 +156,18 @@ function sharedShell(html, root, { title, description }) {
         return `${open}${description}${close}`
       },
     )
+    .replace(
+      /(<meta\s+(?:name|property)="(?:og:image|twitter:image)"[^>]*content=")[^"]*(")/g,
+      `$1${BANNER}$2`,
+    )
 }
 
 const shell = readFileSync('dist/console/index.html', 'utf8')
 for (const [root, meta] of Object.entries(SHARED_SHELLS)) {
   mkdirSync(`dist/${root}`, { recursive: true })
-  writeFileSync(`dist/${root}/404.html`, sharedShell(shell, root, meta))
+  const html = sharedShell(shell, root, meta)
+  writeFileSync(`dist/${root}/index.html`, html)
+  writeFileSync(`dist/${root}/404.html`, html)
 }
 
 // One sitemap index at the domain root, covering both the marketing site and the
