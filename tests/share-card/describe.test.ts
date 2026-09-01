@@ -162,7 +162,7 @@ describe('describeShare', () => {
     })
   })
 
-  it('falls back to the id for a creature no shipped library answers for', async () => {
+  it('uses the generic fallback for a source this deployment does not support', async () => {
     const share = {
       kind: 'encounter',
       data: {
@@ -171,9 +171,27 @@ describe('describeShare', () => {
         entries: [{ ref: 'some-future-book:bone-piper', count: 2, side: 'foe' }],
       },
     }
-    const card = await describeShare(envWith(share), CODE, ORIGIN)
-    expect(card && 'chips' in card && card.chips[0].name).toBe('Bone Piper')
+    expect(await describeShare(envWith(share), CODE, ORIGIN)).toBeNull()
     expect(assetPaths).toEqual([])
+  })
+
+  it('uses the generic fallback when a declared compendium entry is missing', async () => {
+    const share = {
+      kind: 'encounter',
+      data: {
+        v: 1,
+        name: 'Missing creature',
+        entries: [{ ref: 'srd-5.2:missing', count: 1, side: 'foe' }],
+      },
+    }
+    const env = envWith(share, {
+      ASSETS: {
+        async fetch() {
+          return new Response('{}')
+        },
+      },
+    })
+    expect(await describeShare(env, CODE, ORIGIN)).toBeNull()
   })
 
   describe('every failure degrades to the generic shell', () => {
@@ -183,6 +201,21 @@ describe('describeShare', () => {
       ['a code behind no row', null, CODE, {}],
       ['a kind this version has never heard of', { kind: 'campaign', data: {} }, CODE, {}],
       ['a payload that will not parse', { kind: 'encounter', data: { v: 1 } }, CODE, {}],
+      [
+        'a payload from a future schema',
+        { kind: 'encounter', data: { ...encounter.data, v: 2 } },
+        CODE,
+        {},
+      ],
+      [
+        'a hostile payload',
+        {
+          kind: 'encounter',
+          data: JSON.parse('{"v":1,"name":"Hostile","entries":[],"__proto__":{"polluted":true}}'),
+        },
+        CODE,
+        {},
+      ],
       [
         'an environment nobody set the variables in',
         encounter,

@@ -17,6 +17,13 @@ import {
   rmSync,
 } from 'node:fs'
 import { CREATURES_SUFFIX, indexCreatures, indexFileFor } from './compendium-index.mjs'
+import {
+  PUBLICATION_INTERFACE_VERSION,
+  PUBLISHED_SHARE_SCHEMA_VERSION,
+  SOURCE_MANIFEST_VERSION,
+  PUBLICATION_SOURCE_MANIFEST,
+} from '../console/src/publication/index.ts'
+import { createPublicationDeploymentManifest } from './publication-deployment-manifest.mjs'
 
 // Site root (/) → the Astro-built marketing site (home, privacy, terms, 404).
 cpSync('site/dist', 'dist', { recursive: true })
@@ -30,13 +37,44 @@ cpSync('console/dist/console', 'dist/console', { recursive: true })
 // than committed because it is derived: a CR corrected in the compendium repo would
 // otherwise desync from a checked-in copy of it.
 const COMPENDIUM = 'dist/console/compendium'
+const generatedIndexes = new Map()
 if (existsSync(COMPENDIUM)) {
   for (const file of readdirSync(COMPENDIUM)) {
     if (!file.endsWith(CREATURES_SUFFIX)) continue
     const creatures = JSON.parse(readFileSync(`${COMPENDIUM}/${file}`, 'utf8'))
-    writeFileSync(`${COMPENDIUM}/${indexFileFor(file)}`, JSON.stringify(indexCreatures(creatures)))
+    const indexFile = indexFileFor(file)
+    const bytes = JSON.stringify(indexCreatures(creatures))
+    writeFileSync(`${COMPENDIUM}/${indexFile}`, bytes)
+    generatedIndexes.set(indexFile, bytes)
   }
 }
+
+// The source manifest is console-owned authority. Assembly proves every declared source has
+// an exact generated sidecar, then records hashes of the contract, manifest, and sidecars.
+const sourceManifestBytes = `${JSON.stringify(PUBLICATION_SOURCE_MANIFEST, null, 2)}\n`
+writeFileSync('dist/publication-source-manifest.json', sourceManifestBytes)
+const sourceIndexes = PUBLICATION_SOURCE_MANIFEST.sources.map((source) => {
+  const bytes = generatedIndexes.get(source.indexPath)
+  if (bytes === undefined) throw new Error(`Missing publication source index: ${source.id}`)
+  return {
+    sourceId: source.id,
+    path: `console/compendium/${source.indexPath}`,
+    bytes,
+  }
+})
+const publicationManifest = createPublicationDeploymentManifest({
+  publicationInterfaceVersion: PUBLICATION_INTERFACE_VERSION,
+  publishedShareSchemaVersion: PUBLISHED_SHARE_SCHEMA_VERSION,
+  sourceManifestVersion: SOURCE_MANIFEST_VERSION,
+  contractBytes: readFileSync(
+    new URL('../console/src/publication/index.ts', import.meta.url),
+    'utf8',
+  ),
+  sourceManifestBytes,
+  sourceIndexes,
+})
+writeFileSync('dist/publication-deployment-manifest.json', publicationManifest.manifestBytes)
+writeFileSync('dist/publication-deployment-manifest.sha256', `${publicationManifest.sha256}\n`)
 
 // The typeface the share cards are drawn in. Satori needs real font files and cannot read
 // the system stack the brand banner names, so Inter stands in for it. Served as static

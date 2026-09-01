@@ -1,9 +1,31 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Nicola Mustone
 
-import { formatCr, titleCase } from '../console/src/compendium/format.ts'
-import { LICENSE_LABELS, type ContentLicense } from '../console/src/schema/license.ts'
-import { BYLINE_MAX } from '../console/src/lib/byline.ts'
+import type { PublicationLicense } from '../console/src/publication/index.ts'
+
+const BYLINE_MAX = 30
+const LICENSE_LABELS: Record<PublicationLicense, string> = {
+  'cc0-1.0': 'CC0 1.0',
+  'cc-by-4.0': 'CC BY 4.0',
+  'cc-by-sa-4.0': 'CC BY-SA 4.0',
+  'cc-by-nc-4.0': 'CC BY-NC 4.0',
+  'cc-by-nc-sa-4.0': 'CC BY-NC-SA 4.0',
+  'ogl-1.0a': 'OGL 1.0a',
+  reserved: 'All rights reserved',
+  unstated: 'No public license stated',
+}
+
+/** Title-case one allowlisted type or alignment fact for card presentation. */
+const titleCase = (value: string): string =>
+  value.replace(/\b\w/g, (character) => character.toUpperCase())
+
+/** Render the fractional challenge ratings used by published cards. */
+export function formatCardChallenge(cr: number): string {
+  if (cr === 0.125) return '1/8'
+  if (cr === 0.25) return '1/4'
+  if (cr === 0.5) return '1/2'
+  return String(cr)
+}
 
 /**
  * What a `/s/<code>` link says about itself before anyone opens it.
@@ -29,7 +51,7 @@ export interface EncounterCard {
   creatures: number
   by?: string
   /** The publisher's own words: the name, the note, the arrangement. Never the creatures. */
-  license?: ContentLicense
+  license?: PublicationLicense
 }
 
 export interface CreatureCard {
@@ -42,7 +64,7 @@ export interface CreatureCard {
   xp?: number
   by?: string
   /** The stat block's own, which is a different claim from the encounter's. */
-  license?: ContentLicense
+  license?: PublicationLicense
 }
 
 export type ShareCard = EncounterCard | CreatureCard
@@ -67,7 +89,7 @@ export function clipByline(by: string | undefined): string | undefined {
  * `unstated` prints nothing at all. An absent licence is nobody having said, and a line
  * reading "No public license stated" is noise dressed as information.
  */
-export function licenseLabel(license: ContentLicense | undefined): string | undefined {
+export function licenseLabel(license: PublicationLicense | undefined): string | undefined {
   return !license || license === 'unstated' ? undefined : LICENSE_LABELS[license]
 }
 
@@ -109,7 +131,7 @@ export function cardDescription(card: ShareCard): string {
     return `${plural(card.creatures, 'creature')} across ${plural(card.chips.length, 'kind')}.${credit}`
   }
   const line = typeLine(card)
-  const challenge = card.cr == null ? '' : ` Challenge ${formatCr(card.cr)}.`
+  const challenge = card.cr == null ? '' : ` Challenge ${formatCardChallenge(card.cr)}.`
   return `${line ? `${line}.` : ''}${challenge}${credit}`.trim()
 }
 
@@ -130,7 +152,7 @@ export function cardImageAlt(card: ShareCard): string {
     parts.push(`An OpenFray link card for a shared DnD 5e stat block: ${card.name}`)
     const line = typeLine(card)
     if (line) parts.push(line)
-    if (card.cr != null) parts.push(`Challenge ${formatCr(card.cr)}`)
+    if (card.cr != null) parts.push(`Challenge ${formatCardChallenge(card.cr)}`)
   }
   if (by) parts.push(`Shared by ${by}`)
   if (license) {
