@@ -10,21 +10,28 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 const SCRIPT = resolve(__dirname, '../../scripts/release-verification.mjs')
 const roots: string[] = []
+const PRIVATE_VALUES = {
+  authored: 'authored-private-encounter-text',
+  account: 'private-account@example.com',
+  capability: 'capability-code-private',
+  credential: 'credential-private-value',
+  secret: 'secret-private-value',
+  rejected: 'raw-rejected-private-value',
+} as const
 
 interface FixtureOptions {
-  catalog?: boolean
-  validator?: 'pass' | 'reject-private-values'
+  validator?: false | 'pass' | 'reject-private-values' | 'private-metadata'
 }
 
-/** Write a file and create its parent directories. */
-function file(root: string, path: string, content: string): void {
+/** Write a synthetic fixture file and create its parent directories. */
+function writeFixtureFile(root: string, path: string, content: string): void {
   const absolute = join(root, path)
   mkdirSync(dirname(absolute), { recursive: true })
   writeFileSync(absolute, content)
 }
 
-/** Commit every current file in a synthetic repository. */
-function commit(root: string): void {
+/** Initialize and commit every current file in a synthetic repository. */
+function initializeRepository(root: string): void {
   execFileSync('git', ['init', '-q'], { cwd: root })
   execFileSync('git', ['config', 'user.email', 'release-test@invalid.example'], { cwd: root })
   execFileSync('git', ['config', 'user.name', 'Release test'], { cwd: root })
@@ -34,78 +41,52 @@ function commit(root: string): void {
 }
 
 /** Build a committed deployment workspace around the selected fixture-check behavior. */
-function workspace(options: FixtureOptions = {}): string {
+function createWorkspaceFixture(options: FixtureOptions = {}): string {
   const root = mkdtempSync(join(tmpdir(), 'release-verification-'))
   roots.push(root)
 
-  const authored = JSON.stringify({
-    note: 'authored-private-encounter-text',
-    account: 'private-account@example.com',
-    capabilityCode: 'capability-code-private',
-    credential: 'credential-private-value',
-    secret: 'secret-private-value',
-    rejected: 'raw-rejected-private-value',
-  })
+  const authored = JSON.stringify(PRIVATE_VALUES)
   const fixtureHash = createHash('sha256').update(authored).digest('hex')
+  const safeProjection = {
+    fixtures: [
+      {
+        id: 'hardening.hostile.v1',
+        fixtureClass: 'hostile',
+        sha256: fixtureHash,
+      },
+    ],
+  }
   const validator =
     options.validator === 'reject-private-values'
-      ? "console.error('authored-private-encounter-text private-account@example.com capability-code-private credential-private-value secret-private-value raw-rejected-private-value'); process.exit(1)"
-      : "console.log('fixture check passed')"
+      ? `console.error(${JSON.stringify(Object.values(PRIVATE_VALUES).join(' '))}); process.exit(1)`
+      : options.validator === 'private-metadata'
+        ? `console.log(${JSON.stringify(JSON.stringify({ ...safeProjection, fixtures: [{ ...safeProjection.fixtures[0], id: PRIVATE_VALUES.secret }] }))})`
+        : `console.log(${JSON.stringify(JSON.stringify(safeProjection))})`
 
-  file(
-    root,
-    'console/package.json',
-    JSON.stringify({
-      name: 'console-fixture',
-      private: true,
-      scripts: { 'validate:fixtures': 'node validate-fixtures.mjs' },
-    }),
-  )
-  file(root, 'console/validate-fixtures.mjs', validator)
-  if (options.catalog !== false) {
-    file(root, 'console/tests/fixtures/hardening/private-input.json', authored)
-    file(
-      root,
-      'console/tests/fixtures/hardening/catalog.json',
-      JSON.stringify({
-        catalogVersion: 1,
-        fixtures: [
-          {
-            id: 'hardening.hostile.v1',
-            fixtureClass: 'hostile',
-            path: 'private-input.json',
-            sha256: fixtureHash,
-            provenance: 'synthetic',
-            description: 'Description is deliberately excluded from evidence.',
-          },
-        ],
-      }),
-    )
+  writeFixtureFile(root, 'console/private-input.json', authored)
+  if (options.validator !== false) {
+    writeFixtureFile(root, 'console/scripts/validate-hardening-fixtures.mjs', validator)
   }
-  commit(join(root, 'console'))
+  initializeRepository(join(root, 'console'))
 
   for (const repository of ['site', 'handbook']) {
-    file(root, `${repository}/README.md`, repository)
-    commit(join(root, repository))
+    writeFixtureFile(root, `${repository}/README.md`, repository)
+    initializeRepository(join(root, repository))
   }
 
-  file(
-    root,
-    'package.json',
-    JSON.stringify({ name: 'release-fixture', private: true, workspaces: ['console'] }),
-  )
-  file(root, 'package-lock.json', '{"lockfileVersion":3}\n')
-  commit(root)
+  writeFixtureFile(root, 'package.json', JSON.stringify({ name: 'release-fixture', private: true }))
+  writeFixtureFile(root, 'package-lock.json', '{"lockfileVersion":3}\n')
+  initializeRepository(root)
   return root
 }
 
 /** Run the public release-verification command against a synthetic workspace. */
-function verify(root: string) {
+function runVerification(root: string, options: string[] = []) {
   const output = mkdtempSync(join(tmpdir(), 'release-evidence-'))
   roots.push(output)
   const result = spawnSync(
     process.execPath,
-    [SCRIPT, '--output', output, '--environment', 'local', '--approver', 'pending'],
+    [SCRIPT, '--output', output, '--environment', 'local', '--approver', 'pending', ...options],
     { cwd: root, encoding: 'utf8' },
   )
   return {
@@ -121,8 +102,8 @@ afterEach(() => {
 
 describe('release verification', () => {
   it('emits machine-readable evidence and a readable advisory report', () => {
-    const root = workspace()
-    const { manifest, report, result } = verify(root)
+    const root = createWorkspaceFixture()
+    const { manifest, report, result } = runVerification(root)
 
     expect(result.status).toBe(0)
     expect(manifest).toMatchObject({
@@ -139,7 +120,7 @@ describe('release verification', () => {
           id: 'canonical-hardening-fixtures',
           requirementIds: ['EF-1'],
           applicable: true,
-          command: 'npm run validate:fixtures --workspace console',
+          command: 'node console/scripts/validate-hardening-fixtures.mjs --evidence',
           result: 'passed',
         },
       ],
@@ -167,13 +148,13 @@ describe('release verification', () => {
     ])
     expect(report).toContain('# Release verification report')
     expect(report).toContain(
-      '| EF-1 | Canonical hardening fixtures | `npm run validate:fixtures --workspace console` | Passed |',
+      '| EF-1 | Canonical hardening fixtures | `node console/scripts/validate-hardening-fixtures.mjs --evidence` | Passed |',
     )
   })
 
   it('records an applicable missing check and exits unsuccessfully', () => {
-    const root = workspace({ catalog: false })
-    const { manifest, report, result } = verify(root)
+    const root = createWorkspaceFixture({ validator: false })
+    const { manifest, report, result } = runVerification(root)
 
     expect(result.status).toBe(1)
     expect(manifest.result).toBe('failed')
@@ -185,28 +166,42 @@ describe('release verification', () => {
       }),
     ])
     expect(report).toContain(
-      '| EF-1 | Canonical hardening fixtures | `npm run validate:fixtures --workspace console` | Missing |',
+      '| EF-1 | Canonical hardening fixtures | `node console/scripts/validate-hardening-fixtures.mjs --evidence` | Missing |',
     )
   })
 
   it('never copies private fixture data or rejected command output into evidence', () => {
-    const root = workspace({ validator: 'reject-private-values' })
-    const { manifest, report, result } = verify(root)
+    const root = createWorkspaceFixture({ validator: 'reject-private-values' })
+    const { manifest, report, result } = runVerification(root)
     const evidence = `${JSON.stringify(manifest)}\n${report}`
 
     expect(result.status).toBe(1)
-    for (const privateValue of [
-      'authored-private-encounter-text',
-      'private-account@example.com',
-      'capability-code-private',
-      'credential-private-value',
-      'secret-private-value',
-      'raw-rejected-private-value',
-    ]) {
+    for (const privateValue of Object.values(PRIVATE_VALUES)) {
       expect(evidence).not.toContain(privateValue)
     }
     expect(evidence).not.toContain('stdout')
     expect(evidence).not.toContain('stderr')
     expect(manifest.checks[0].result).toBe('failed')
+  })
+
+  it('rejects private values injected into fixture identity metadata', () => {
+    const root = createWorkspaceFixture({ validator: 'private-metadata' })
+    const { manifest, report, result } = runVerification(root)
+    const evidence = `${JSON.stringify(manifest)}\n${report}`
+
+    expect(result.status).toBe(1)
+    expect(manifest.checks[0].result).toBe('failed')
+    expect(manifest.inputs.fixtures).toEqual([])
+    expect(evidence).not.toContain(PRIVATE_VALUES.secret)
+  })
+
+  it('requires an immutable rollback target for production evidence', () => {
+    const root = createWorkspaceFixture()
+    const { manifest, report, result } = runVerification(root, ['--environment', 'production'])
+
+    expect(result.status).toBe(1)
+    expect(manifest.rollbackTarget).toBeNull()
+    expect(manifest.inputs.rollbackReady).toBe(false)
+    expect(report).toContain('- **Rollback target:** Missing')
   })
 })

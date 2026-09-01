@@ -3,7 +3,7 @@
 
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -11,11 +11,9 @@ const CHECK = {
   id: 'canonical-hardening-fixtures',
   name: 'Canonical hardening fixtures',
   requirementIds: ['EF-1'],
-  command: 'npm run validate:fixtures --workspace console',
-  executable: 'npm',
-  arguments: ['run', 'validate:fixtures', '--workspace', 'console'],
+  command: 'node console/scripts/validate-hardening-fixtures.mjs --evidence',
+  arguments: ['console/scripts/validate-hardening-fixtures.mjs', '--evidence'],
 }
-const CATALOG_PATH = 'console/tests/fixtures/hardening/catalog.json'
 const REPOSITORIES = [
   { name: 'openfray', path: '.' },
   { name: 'console', path: 'console' },
@@ -24,9 +22,9 @@ const REPOSITORIES = [
 ]
 const ENVIRONMENTS = new Set(['local', 'staging', 'production'])
 const APPROVERS = new Set(['pending', 'maintainer'])
-const FIXTURE_ID = /^hardening\.[a-z0-9-]+(?:\.\d+)?\.v[1-9]\d*$/
-const FIXTURE_CLASS = /^[a-z][a-z0-9-]*$/
-const FIXTURE_FILE = /^[a-z0-9-]+\.json$/
+const SAFE_EVIDENCE_TOKEN = /^[a-z0-9.-]{1,80}$/
+const PRIVATE_EVIDENCE_WORD =
+  /(?:account|authored|capability|credential|password|rejected|secret|token)/
 const SHA256 = /^[0-9a-f]{64}$/
 const COMMIT = /^[0-9a-f]{40}$/
 
@@ -89,70 +87,76 @@ function lockfileEvidence(root) {
   }
 }
 
-/** Return whether the console declares the fixture command selected by this gate. */
-function hasFixtureCommand(root) {
-  try {
-    const packageJson = JSON.parse(readFileSync(resolve(root, 'console/package.json'), 'utf8'))
-    return typeof packageJson?.scripts?.['validate:fixtures'] === 'string'
-  } catch {
-    return false
-  }
+/** Return whether a bounded evidence token excludes private-data vocabulary. */
+function isSafeEvidenceToken(value) {
+  return SAFE_EVIDENCE_TOKEN.test(value) && !PRIVATE_EVIDENCE_WORD.test(value)
 }
 
-/** Capture only validated fixture identities and hashes from the canonical catalog. */
-function fixtureEvidence(root) {
+/** Decode the console-owned fixture projection without copying rejected values. */
+function decodeFixtureEvidence(serialized) {
   try {
-    const catalog = JSON.parse(readFileSync(resolve(root, CATALOG_PATH), 'utf8'))
-    if (catalog?.catalogVersion !== 1 || !Array.isArray(catalog.fixtures)) return null
-    const fixtures = catalog.fixtures.map((fixture) => {
+    const evidence = JSON.parse(serialized)
+    if (!Array.isArray(evidence?.fixtures) || evidence.fixtures.length === 0) return null
+    const fixtures = evidence.fixtures.map((fixture) => {
       if (
-        !FIXTURE_ID.test(fixture?.id ?? '') ||
-        !FIXTURE_CLASS.test(fixture?.fixtureClass ?? '') ||
-        !SHA256.test(fixture?.sha256 ?? '') ||
-        !FIXTURE_FILE.test(fixture?.path ?? '')
+        !isSafeEvidenceToken(fixture?.id ?? '') ||
+        !isSafeEvidenceToken(fixture?.fixtureClass ?? '') ||
+        !SHA256.test(fixture?.sha256 ?? '')
       ) {
-        throw new Error('Invalid fixture evidence metadata')
+        throw new Error('Unsafe fixture evidence')
       }
-      const bytes = readFileSync(resolve(root, 'console/tests/fixtures/hardening', fixture.path))
-      if (sha256(bytes) !== fixture.sha256) throw new Error('Fixture hash mismatch')
       return {
         id: fixture.id,
         fixtureClass: fixture.fixtureClass,
         sha256: fixture.sha256,
       }
     })
-    return fixtures.length > 0 ? fixtures : null
+    return fixtures
   } catch {
     return null
   }
 }
 
-/** Run the selected acceptance check without copying its output into release evidence. */
-function runFixtureCheck(root, fixtures) {
+/** Run the selected acceptance check without copying its rejected output into evidence. */
+function runFixtureCheck(root) {
   const startedAt = new Date().toISOString()
-  const commandAvailable = hasFixtureCommand(root)
+  const commandAvailable = existsSync(resolve(root, CHECK.arguments[0]))
   let result = 'missing'
   let exitCode = null
-  if (commandAvailable && fixtures !== null) {
-    const execution = spawnSync(CHECK.executable, CHECK.arguments, {
+  let fixtures = []
+  if (commandAvailable) {
+    const execution = spawnSync(process.execPath, CHECK.arguments, {
       cwd: root,
       encoding: 'utf8',
       stdio: 'pipe',
     })
     exitCode = Number.isInteger(execution.status) ? execution.status : null
-    result = execution.status === 0 ? 'passed' : 'failed'
+    const decoded = execution.status === 0 ? decodeFixtureEvidence(execution.stdout) : null
+    result = execution.status === 0 && decoded !== null ? 'passed' : 'failed'
+    fixtures = decoded ?? []
   }
   return {
-    id: CHECK.id,
-    name: CHECK.name,
-    requirementIds: CHECK.requirementIds,
-    applicable: true,
-    command: CHECK.command,
-    result,
-    exitCode,
-    startedAt,
-    completedAt: new Date().toISOString(),
+    check: {
+      id: CHECK.id,
+      name: CHECK.name,
+      requirementIds: CHECK.requirementIds,
+      applicable: true,
+      command: CHECK.command,
+      result,
+      exitCode,
+      startedAt,
+      completedAt: new Date().toISOString(),
+    },
+    fixtures,
   }
+}
+
+/** Return whether a production rollback target resolves to an immutable commit. */
+function rollbackTargetReady(root, environment, rollbackTarget) {
+  if (environment !== 'production') return true
+  if (rollbackTarget === null) return false
+  const result = spawnSync('git', ['cat-file', '-e', `${rollbackTarget}^{commit}`], { cwd: root })
+  return result.status === 0
 }
 
 /** Format an ISO timestamp for the fixed human-readable report vocabulary. */
@@ -175,7 +179,7 @@ function renderReport(manifest) {
     `- **Environment:** ${displayStatus(manifest.environment.identity)}`,
     `- **Generated:** ${displayTimestamp(manifest.generatedAt)}`,
     `- **Approver:** ${displayStatus(manifest.approver)}`,
-    `- **Rollback target:** ${manifest.rollbackTarget ?? 'Not applicable'}`,
+    `- **Rollback target:** ${manifest.rollbackTarget ?? (manifest.environment.identity === 'production' ? 'Missing' : 'Not applicable')}`,
     `- **Working tree:** ${manifest.inputs.workingTreeClean ? 'Clean' : 'Has uncommitted changes'}`,
     '',
     '## Immutable inputs',
@@ -222,15 +226,16 @@ function renderReport(manifest) {
 export function verifyRelease({ root = process.cwd(), ...options }) {
   const repositories = repositoryEvidence(root)
   const lockfiles = lockfileEvidence(root)
-  const fixtures = fixtureEvidence(root)
+  const fixtureCheck = runFixtureCheck(root)
   const workingTreeClean = isCleanWorkspace(root)
-  const check = runFixtureCheck(root, fixtures)
+  const rollbackReady = rollbackTargetReady(root, options.environment, options.rollbackTarget)
   const inputsComplete =
     repositories.every((repository) => repository.commit !== null) &&
     lockfiles.length > 0 &&
-    fixtures !== null &&
-    workingTreeClean
-  const passed = inputsComplete && check.result === 'passed'
+    fixtureCheck.fixtures.length > 0 &&
+    workingTreeClean &&
+    rollbackReady
+  const passed = inputsComplete && fixtureCheck.check.result === 'passed'
   const manifest = {
     schemaVersion: 1,
     releaseClass: 'advisory',
@@ -249,10 +254,11 @@ export function verifyRelease({ root = process.cwd(), ...options }) {
     inputs: {
       repositories,
       lockfiles,
-      fixtures: fixtures ?? [],
+      fixtures: fixtureCheck.fixtures,
       workingTreeClean,
+      rollbackReady,
     },
-    checks: [check],
+    checks: [fixtureCheck.check],
   }
   const output = resolve(root, options.output)
   mkdirSync(output, { recursive: true })
