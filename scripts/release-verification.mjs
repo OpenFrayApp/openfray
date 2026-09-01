@@ -11,8 +11,13 @@ const CHECK = {
   id: 'canonical-hardening-fixtures',
   name: 'Canonical hardening fixtures',
   requirementIds: ['EF-1'],
-  command: 'node console/scripts/validate-hardening-fixtures.mjs --evidence',
-  arguments: ['console/scripts/validate-hardening-fixtures.mjs', '--evidence'],
+  command:
+    'node console/scripts/validate-hardening-fixtures.mjs console/tests/fixtures/hardening/catalog.json --evidence',
+  arguments: [
+    'console/scripts/validate-hardening-fixtures.mjs',
+    'console/tests/fixtures/hardening/catalog.json',
+    '--evidence',
+  ],
 }
 const REPOSITORIES = [
   { name: 'openfray', path: '.' },

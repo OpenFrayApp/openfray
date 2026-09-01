@@ -120,7 +120,8 @@ describe('release verification', () => {
           id: 'canonical-hardening-fixtures',
           requirementIds: ['EF-1'],
           applicable: true,
-          command: 'node console/scripts/validate-hardening-fixtures.mjs --evidence',
+          command:
+            'node console/scripts/validate-hardening-fixtures.mjs console/tests/fixtures/hardening/catalog.json --evidence',
           result: 'passed',
         },
       ],
@@ -148,7 +149,7 @@ describe('release verification', () => {
     ])
     expect(report).toContain('# Release verification report')
     expect(report).toContain(
-      '| EF-1 | Canonical hardening fixtures | `node console/scripts/validate-hardening-fixtures.mjs --evidence` | Passed |',
+      '| EF-1 | Canonical hardening fixtures | `node console/scripts/validate-hardening-fixtures.mjs console/tests/fixtures/hardening/catalog.json --evidence` | Passed |',
     )
   })
 
@@ -166,7 +167,7 @@ describe('release verification', () => {
       }),
     ])
     expect(report).toContain(
-      '| EF-1 | Canonical hardening fixtures | `node console/scripts/validate-hardening-fixtures.mjs --evidence` | Missing |',
+      '| EF-1 | Canonical hardening fixtures | `node console/scripts/validate-hardening-fixtures.mjs console/tests/fixtures/hardening/catalog.json --evidence` | Missing |',
     )
   })
 
