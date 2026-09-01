@@ -2,7 +2,7 @@ Guidance for AI agents (and humans) working across the OpenFray repos. This file
 the source of truth for the **cross-repo agreements**: code style, writing style,
 committing, and content licensing. Each part's own AGENTS.md carries its domain
 (the console's scope principle and architecture, the site's books and styling, the
-docs repo's screenshot pipeline). The full reasoning lives in the maintainer's
+handbook repo's screenshot pipeline). The full reasoning lives in the maintainer's
 working notes (`local/docs/`), which are **not committed**.
 
 Its counterpart for words is [`STYLE.md`](./STYLE.md), the shared core of the
@@ -19,6 +19,20 @@ In here:
 - [Licensing of content](#licensing-of-content)
 
 ---
+
+## Agent skills
+
+### Issue tracker
+
+GitHub issues live in the repository that owns the work. Cross-repo issues live in OpenFrayApp/openfray. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Triage uses five workflow labels, three release-impact labels, and three product-area labels. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Domain documentation uses a multi-context layout covering the workspace and its related repositories. See `docs/agents/domain.md`.
 
 ## What OpenFray is
 
@@ -50,7 +64,7 @@ This parent repo owns the deploy and the shared docs.
 | ---------------------------- | --------------------- | ------------------------------------------------------- | ---------- |
 | `console/`                   | `OpenFrayApp/console` | the React + Vite combat console                         | `/console` |
 | `site/`                      | `OpenFrayApp/site`    | Astro marketing site, plus the published libraries      | `/`        |
-| `docs/`                      | `OpenFrayApp/docs`    | Starlight handbook for players and GMs                  | `/docs`    |
+| `handbook/`                  | `OpenFrayApp/docs`    | Starlight handbook for players and GMs                  | `/docs`    |
 | `console/public/compendium/` | —                     | generated SRD / Tome of Beasts JSON the app fetches     | —          |
 | `functions/`                 | —                     | Pages Functions: the card a shared link unfurls with    | `/s/*`     |
 | `share-card/`                | —                     | what a share says about itself, read by those Functions | —          |
@@ -64,7 +78,7 @@ what deploys (`npm run release` does the whole dance).
 
 Each part documents itself: the console's AGENTS.md holds the scope principle in
 full, the architectural rules, and the build order; the site's holds the book
-sources, the print edition, and the styling rules; the docs repo's holds the
+sources, the print edition, and the styling rules; the handbook repo's holds the
 screenshot pipeline. `STYLE.md` here governs the copy in all of them.
 
 ### Pages Functions
@@ -88,7 +102,7 @@ Four things about them.
 
 ### Workspaces & dev servers
 
-`console/`, `site/`, and `docs/` are **npm workspaces** of this repo: one
+`console/`, `site/`, and `handbook/` are **npm workspaces** of this repo: one
 `npm install` here covers all three, and each still declares its own dependencies in
 its own `package.json`. There is one lockfile, at this root.
 
@@ -96,12 +110,12 @@ Each part runs its own dev server, on a port pinned in its own config, not passe
 the command line, so the npm scripts and the editor's launch configs agree
 (`npm run dev` at this root is an alias for the console's):
 
-| Command                  | What it starts             | URL                     |
-| ------------------------ | -------------------------- | ----------------------- |
-| `npm run dev -w console` | the console (Vite)         | localhost:5199/console/ |
-| `npm run dev -w site`    | the marketing site (Astro) | localhost:4321          |
-| `npm run dev -w docs`    | the handbook (Starlight)   | localhost:4322/docs/    |
-| `npm run dev:all`        | all three at once          | the three URLs above    |
+| Command                   | What it starts             | URL                     |
+| ------------------------- | -------------------------- | ----------------------- |
+| `npm run dev -w console`  | the console (Vite)         | localhost:5199/console/ |
+| `npm run dev -w site`     | the marketing site (Astro) | localhost:4321          |
+| `npm run dev -w handbook` | the handbook (Starlight)   | localhost:4322/docs/    |
+| `npm run dev:all`         | all three at once          | the three URLs above    |
 
 Most work needs only one of them. `npm run build` builds all three and assembles
 `dist/` — the only check that proves the **links between** the parts resolve, since in
@@ -122,7 +136,7 @@ extension). They are not submodules here; nothing in the deploy reads them.
 Two more are npm packages, general enough that nothing about them is OpenFray's:
 [opendice](https://github.com/SirDarcanos/opendice) rolls the dice, and
 [shotlist](https://github.com/SirDarcanos/shotlist) takes the screenshots. The
-screenshot pipeline itself (recipes, config, annotation scripts) lives in the docs
+screenshot pipeline itself (recipes, config, annotation scripts) lives in the handbook
 repo, documented in its AGENTS.md.
 
 ## Code style
@@ -161,7 +175,7 @@ what a name can't.
 Every Markdown file in every OpenFray repo is technical documentation written for a
 developer or a user who needs to get something done. That includes each repo's
 `AGENTS.md` and `README.md`, `CONTRIBUTING.md` and `STYLE.md` here, the console
-repo's `CHANGELOG.md`, the handbook in the docs repo, the news posts in the site
+repo's `CHANGELOG.md`, the handbook in the handbook repo, the news posts in the site
 repo, and the skill files in the site repo's `.claude/skills/`. Write all of it
 plain, short, and direct. Every repo carries the same `scripts/check-prose.mjs`,
 scoped to its own files. Nothing in these repos is an essay.
@@ -196,7 +210,7 @@ the same commit.
 
 - **Where they live:** the console's suite is `console/tests/`, mirroring
   `console/src/` (never co-located). The site's is `site/tests/`, which also covers
-  its build checks. The docs repo's covers its annotation scripts. The deploy
+  its build checks. The handbook repo's covers its annotation scripts. The deploy
   scripts are covered from `tests/scripts/` in this repo.
 - **How they run:** `npm run test` at this root chains every suite; each repo also
   runs its own with `npm test`. Tests default to the fast node environment; a

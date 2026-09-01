@@ -4,6 +4,6 @@
 [submodule "site"]
 	path = site
 	url = https://github.com/OpenFrayApp/site.git
-[submodule "docs"]
-	path = docs
+[submodule "handbook"]
+	path = handbook
 	url = https://github.com/OpenFrayApp/docs.git

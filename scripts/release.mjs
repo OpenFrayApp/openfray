@@ -13,7 +13,7 @@ const run = (cmd) => execSync(cmd, { stdio: 'inherit' })
 run('git submodule update --remote')
 run('npm install')
 
-const changed = execSync('git status --porcelain console site docs package-lock.json', {
+const changed = execSync('git status --porcelain console site handbook package-lock.json', {
   encoding: 'utf8',
 }).trim()
 if (!changed) {
@@ -24,6 +24,6 @@ if (!changed) {
 run('npm run build')
 
 const message = process.argv[2] ?? 'Build: release the latest of every part'
-run('git add console site docs package-lock.json')
+run('git add console site handbook package-lock.json')
 execFileSync('git', ['commit', '-m', message], { stdio: 'inherit' })
 run('git push')

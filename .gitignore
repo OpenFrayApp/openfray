@@ -63,6 +63,7 @@ Thumbs.db
 # Local-only scratch (session notes, handoff docs) — never committed.
 # ───────────────────────────────────────────────────────────────
 local/
+.pi/
 
 # ───────────────────────────────────────────────────────────────
 # Misc

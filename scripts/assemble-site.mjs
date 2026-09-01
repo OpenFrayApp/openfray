@@ -3,7 +3,7 @@
 
 // Assembles dist/ for Cloudflare Pages. Vite builds the app into
 // console/dist/console (base = /console/), Astro builds the marketing site into
-// site/dist, and Starlight builds the handbook into docs/dist (base = /docs/). This
+// site/dist, and Starlight builds the handbook into handbook/dist (base = /docs/). This
 // step copies each into the dist root and writes the Pages routing rules. Output
 // dir for Pages is dist/.
 import {
@@ -57,7 +57,7 @@ rmSync('dist/lab', { recursive: true, force: true })
 
 // /docs → the Starlight handbook, built with base = /docs/ so its links and assets
 // already point under /docs. Copy it in wholesale.
-cpSync('docs/dist', 'dist/docs', { recursive: true })
+cpSync('handbook/dist', 'dist/docs', { recursive: true })
 
 // The handbook is organised by Diátaxis quadrant: concepts/, guides/, and reference/,
 // with the tutorial at /docs/getting-started/. Every URL an earlier layout used 301s

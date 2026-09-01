@@ -4,12 +4,12 @@ The shared foundation for every word OpenFray publishes. The reader is always a 
 Master; the voice depends on the surface, and each surface's repo carries its own
 guide:
 
-| Repo        | Guide      | Voice                                                        |
-| ----------- | ---------- | ------------------------------------------------------------ |
-| `docs`      | `STYLE.md` | **Teaching.** The handbook explains; it never sells.         |
-| `site`      | `STYLE.md` | **Persuading.** The site argues a GM into opening the console, and carries the books. |
-| `console`   | `STYLE.md` | **Labeling.** Buttons, tooltips, errors, empty states.       |
-| `compendium`| `STYLE.md` | **Data.** Stat-block and spell text: rules, nothing else.    |
+| Repo         | Guide      | Voice                                                                                 |
+| ------------ | ---------- | ------------------------------------------------------------------------------------- |
+| `handbook`   | `STYLE.md` | **Teaching.** The handbook explains; it never sells.                                  |
+| `site`       | `STYLE.md` | **Persuading.** The site argues a GM into opening the console, and carries the books. |
+| `console`    | `STYLE.md` | **Labeling.** Buttons, tooltips, errors, empty states.                                |
+| `compendium` | `STYLE.md` | **Data.** Stat-block and spell text: rules, nothing else.                             |
 
 **Write in the register of the repo you are in.** A page of handbook copy in the
 site's voice, or site copy in the handbook's, is a bug. This file holds only what

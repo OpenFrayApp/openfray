@@ -73,7 +73,7 @@ fine; computing what a character can do is not.
 
 The console, the site, and the handbook each live in their own repo
 ([console](https://github.com/OpenFrayApp/console),
-[site](https://github.com/OpenFrayApp/site), [docs](https://github.com/OpenFrayApp/docs)),
+[site](https://github.com/OpenFrayApp/site), [handbook](https://github.com/OpenFrayApp/docs)),
 and each runs on its own: clone it, `npm install`, `npm run dev` (the site wants a
 `console` clone beside it for the stat blocks it renders). This repo is the deploy:
 it mounts the three as git submodules, and building it assembles the one site that
@@ -97,14 +97,14 @@ How the repo is organized, the architectural rules, and the code style live in
 
 ## The repositories
 
-| Repo | What it is |
-| --- | --- |
-| [console](https://github.com/OpenFrayApp/console) | The combat console, a React + Vite app served at `/console` |
-| [site](https://github.com/OpenFrayApp/site) | The website and OpenFray's published libraries |
-| [docs](https://github.com/OpenFrayApp/docs) | The handbook, and the screenshot pipeline behind every capture |
-| [openfray](https://github.com/OpenFrayApp/openfray) | This repo: the deploy that assembles the three, and the working agreements |
-| [compendium](https://github.com/OpenFrayApp/compendium) | The ingest tooling that generates the compendium JSON the console ships |
-| [importer](https://github.com/OpenFrayApp/importer) | A browser extension that turns a D&D Beyond creature page into OpenFray JSON |
+| Repo                                                    | What it is                                                                   |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| [console](https://github.com/OpenFrayApp/console)       | The combat console, a React + Vite app served at `/console`                  |
+| [site](https://github.com/OpenFrayApp/site)             | The website and OpenFray's published libraries                               |
+| [handbook](https://github.com/OpenFrayApp/docs)         | The handbook, and the screenshot pipeline behind every capture               |
+| [openfray](https://github.com/OpenFrayApp/openfray)     | This repo: the deploy that assembles the three, and the working agreements   |
+| [compendium](https://github.com/OpenFrayApp/compendium) | The ingest tooling that generates the compendium JSON the console ships      |
+| [importer](https://github.com/OpenFrayApp/importer)     | A browser extension that turns a D&D Beyond creature page into OpenFray JSON |
 
 ## Content & licensing
 

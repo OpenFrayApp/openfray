@@ -32,7 +32,7 @@ beforeEach(() => {
   file('site/dist/lab/index.html', '<html>lab</html>')
   file('site/dist/lab/loop.mp4', 'mp4')
   file('site/dist/sitemap-index.xml', '<sitemapindex>site-only</sitemapindex>')
-  file('docs/dist/index.html', '<html>docs</html>')
+  file('handbook/dist/index.html', '<html>docs</html>')
   file('brand/fonts/inter-500.ttf', 'ttf')
   file('brand/fonts/LICENSE.txt', 'the SIL Open Font License')
   file(

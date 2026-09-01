@@ -16,9 +16,9 @@
       "autoPort": false
     },
     {
-      "name": "docs",
+      "name": "handbook",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "-w", "docs"],
+      "runtimeArgs": ["run", "dev", "-w", "handbook"],
       "port": 4322,
       "autoPort": false
     }

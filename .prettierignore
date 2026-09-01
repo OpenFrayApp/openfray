@@ -1,7 +1,7 @@
 # The parts format themselves; this repo formats only its own files.
 console
 site
-docs
+handbook
 
 node_modules
 dist

@@ -63,11 +63,11 @@ npm install
 The three parts ship as one site. Each has its own dev server; most work needs
 only one:
 
-| Command                  | What it starts             | URL                     |
-| ------------------------ | -------------------------- | ----------------------- |
-| `npm run dev -w console` | the console (Vite)         | localhost:5199/console/ |
-| `npm run dev -w site`    | the marketing site (Astro) | localhost:4321          |
-| `npm run dev -w docs`    | the handbook (Starlight)   | localhost:4322/docs/    |
+| Command                   | What it starts             | URL                     |
+| ------------------------- | -------------------------- | ----------------------- |
+| `npm run dev -w console`  | the console (Vite)         | localhost:5199/console/ |
+| `npm run dev -w site`     | the marketing site (Astro) | localhost:4321          |
+| `npm run dev -w handbook` | the handbook (Starlight)   | localhost:4322/docs/    |
 
 A change to a part is committed in that part's repo, on a branch, and PRed there;
 a change to the deploy scripts or the shared docs is PRed here.
