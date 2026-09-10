@@ -85,7 +85,14 @@ describe('CSP report boundary', () => {
     expect((await handleCspReportRequest(privateDirective, log)).status).toBe(400)
     expect((await handleCspReportRequest(malformed, log)).status).toBe(400)
     expect((await handleCspReportRequest(oversized, log)).status).toBe(413)
-    expect(log).not.toHaveBeenCalled()
+    const diagnostics = JSON.stringify(log.mock.calls)
+    for (const value of Object.values(PRIVATE_VALUES)) expect(diagnostics).not.toContain(value)
+    expect(log).toHaveBeenCalledWith({
+      kind: 'public-route',
+      requestId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      route: 'csp-report',
+      outcome: 'invalid',
+    })
   })
 
   it('cancels a chunked body as soon as it crosses the byte ceiling', async () => {
@@ -111,6 +118,19 @@ describe('CSP report boundary', () => {
     expect((await handleCspReportRequest(chunked, log)).status).toBe(413)
     expect(cancel).toHaveBeenCalledOnce()
     expect(log).not.toHaveBeenCalled()
+  })
+
+  it('applies its route-specific limiter before reading the body', async () => {
+    const log = vi.fn()
+    const limiter = { allow: vi.fn(async () => false) }
+
+    const response = await handleCspReportRequest(request(), log, limiter)
+
+    expect(response.status).toBe(429)
+    expect(limiter.allow).toHaveBeenCalledOnce()
+    expect(log).toHaveBeenCalledWith(
+      expect.objectContaining({ route: 'csp-report', outcome: 'limited' }),
+    )
   })
 
   it('rejects unsupported methods and content types', async () => {

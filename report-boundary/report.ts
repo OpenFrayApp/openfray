@@ -6,11 +6,23 @@ import {
   isReportReason,
   REPORT_LIMITS,
 } from '../console/src/publication/index.ts'
+import {
+  boundedJson,
+  failureResponse,
+  identifyResponse,
+  publicRequestId,
+  routeRateLimiter,
+  PUBLIC_ROUTE_POLICIES,
+  readBoundedBody,
+  remainingTime,
+  supabaseCoordinates,
+  type PublicRouteEnv,
+} from '../public-boundary/route.ts'
 
 const TURNSTILE_VERIFY = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
 
 /** Secrets and public project coordinates available to the report Function. */
-export interface ReportEnv {
+export interface ReportEnv extends PublicRouteEnv {
   SUPABASE_URL?: string
   SUPABASE_ANON_KEY?: string
   VITE_SUPABASE_URL?: string
@@ -32,31 +44,27 @@ interface ReportInput {
 type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
 
 /** Return a privacy-safe JSON response that must not be cached. */
-function answer(status: number, result: string): Response {
-  return Response.json(
-    { result },
-    { status, headers: { 'cache-control': 'no-store', 'content-type': 'application/json' } },
+function answer(status: number, result: string, requestId: string): Response {
+  return identifyResponse(
+    Response.json(
+      { result },
+      { status, headers: { 'cache-control': 'no-store', 'content-type': 'application/json' } },
+    ),
+    requestId,
   )
 }
 
-/** Return the configured Supabase URL and public API key. */
-function database(env: ReportEnv): { url: string; key: string } | null {
-  const url = env.SUPABASE_URL || env.VITE_SUPABASE_URL
-  const key = env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY
-  return url && key ? { url: url.replace(/\/$/, ''), key } : null
-}
-
 /** Parse one bounded report body without retaining unknown fields. */
-async function parseReport(request: Request): Promise<ReportInput | 'large' | null> {
-  const declared = Number(request.headers.get('content-length') ?? 0)
-  if (Number.isFinite(declared) && declared > REPORT_LIMITS.requestBytes) return 'large'
-  let bytes: ArrayBuffer
-  try {
-    bytes = await request.arrayBuffer()
-  } catch {
-    return null
-  }
-  if (bytes.byteLength > REPORT_LIMITS.requestBytes) return 'large'
+async function parseReport(
+  request: Request,
+  deadline: number,
+): Promise<ReportInput | 'large' | 'timed_out' | null> {
+  const bytes = await readBoundedBody(
+    request,
+    REPORT_LIMITS.requestBytes,
+    AbortSignal.timeout(remainingTime(deadline)),
+  )
+  if (bytes === 'large' || bytes === 'timed_out' || bytes === null) return bytes
   let value: unknown
   try {
     value = JSON.parse(new TextDecoder().decode(bytes))
@@ -92,31 +100,40 @@ async function verifyChallenge(
   network: string,
   env: ReportEnv,
   fetcher: Fetcher,
-): Promise<boolean> {
+  deadline: number,
+): Promise<'ok' | 'invalid' | 'unavailable' | 'timed_out'> {
   const body = new FormData()
   body.set('secret', env.TURNSTILE_SECRET_KEY ?? '')
   body.set('response', input.challenge)
   body.set('remoteip', network)
   body.set('idempotency_key', crypto.randomUUID())
-  try {
-    const response = await fetcher(TURNSTILE_VERIFY, { method: 'POST', body })
-    if (!response.ok) return false
-    const verdict = (await response.json()) as Record<string, unknown>
-    const hosts = new Set(
-      (env.REPORT_ALLOWED_HOSTS ?? '')
-        .split(',')
-        .map((host) => host.trim().toLowerCase())
-        .filter(Boolean),
-    )
-    return (
-      verdict.success === true &&
-      verdict.action === 'report' &&
-      typeof verdict.hostname === 'string' &&
-      hosts.has(verdict.hostname.toLowerCase())
-    )
-  } catch {
-    return false
+  const result = await boundedJson(
+    fetcher,
+    TURNSTILE_VERIFY,
+    { method: 'POST', body },
+    {
+      timeoutMs: remainingTime(deadline),
+      responseBytes: 8_192,
+    },
+  )
+  if (result.status === 'timed_out') return 'timed_out'
+  if (result.status !== 'ok' || !result.response.ok) return 'unavailable'
+  if (typeof result.value !== 'object' || result.value === null || Array.isArray(result.value)) {
+    return 'unavailable'
   }
+  const verdict = result.value as Record<string, unknown>
+  const hosts = new Set(
+    (env.REPORT_ALLOWED_HOSTS ?? '')
+      .split(',')
+      .map((host) => host.trim().toLowerCase())
+      .filter(Boolean),
+  )
+  return verdict.success === true &&
+    verdict.action === 'report' &&
+    typeof verdict.hostname === 'string' &&
+    hosts.has(verdict.hostname.toLowerCase())
+    ? 'ok'
+    : 'invalid'
 }
 
 /** Confirm that the capability still names a currently published row. */
@@ -124,11 +141,14 @@ async function publishedShare(
   input: ReportInput,
   env: ReportEnv,
   fetcher: Fetcher,
-): Promise<boolean> {
-  const db = database(env)
-  if (!db) return false
-  try {
-    const response = await fetcher(`${db.url}/rest/v1/rpc/share`, {
+  deadline: number,
+): Promise<'ok' | 'missing' | 'unavailable' | 'timed_out'> {
+  const db = supabaseCoordinates(env)
+  if (!db) return 'unavailable'
+  const result = await boundedJson(
+    fetcher,
+    `${db.url}/rest/v1/rpc/share`,
+    {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -136,18 +156,18 @@ async function publishedShare(
         authorization: `Bearer ${db.key}`,
       },
       body: JSON.stringify({ want: input.code }),
-    })
-    if (!response.ok) return false
-    const value: unknown = await response.json()
-    return (
-      typeof value === 'object' &&
-      value !== null &&
-      !Array.isArray(value) &&
-      !('taken_down' in value)
-    )
-  } catch {
-    return false
-  }
+    },
+    { timeoutMs: remainingTime(deadline), responseBytes: 65_536 },
+  )
+  if (result.status === 'timed_out') return 'timed_out'
+  if (result.status !== 'ok' || !result.response.ok) return 'unavailable'
+  const value = result.value
+  return typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    !('taken_down' in value)
+    ? 'ok'
+    : 'missing'
 }
 
 /** Return an unlinkable HMAC for quota and duplicate comparisons. */
@@ -170,9 +190,10 @@ async function insertReport(
   network: string,
   env: ReportEnv,
   fetcher: Fetcher,
-): Promise<string | null> {
-  const db = database(env)
-  if (!db || !env.REPORT_FINGERPRINT_KEY || !env.REPORT_INGRESS_TOKEN) return null
+  deadline: number,
+): Promise<string | 'unavailable' | 'timed_out'> {
+  const db = supabaseCoordinates(env)
+  if (!db || !env.REPORT_FINGERPRINT_KEY || !env.REPORT_INGRESS_TOKEN) return 'unavailable'
   const networkKey = await fingerprint(env.REPORT_FINGERPRINT_KEY, `network:${network}`)
   const duplicateKey = await fingerprint(
     env.REPORT_FINGERPRINT_KEY,
@@ -184,8 +205,10 @@ async function insertReport(
       input.replyTo.trim(),
     ]),
   )
-  try {
-    const response = await fetcher(`${db.url}/rest/v1/rpc/accept_share_report`, {
+  const result = await boundedJson(
+    fetcher,
+    `${db.url}/rest/v1/rpc/accept_share_report`,
+    {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -200,11 +223,13 @@ async function insertReport(
         network_key: networkKey,
         duplicate_key: duplicateKey,
       }),
-    })
-    return response.ok ? ((await response.json()) as string) : null
-  } catch {
-    return null
-  }
+    },
+    { timeoutMs: remainingTime(deadline), responseBytes: 1_024 },
+  )
+  if (result.status === 'timed_out') return 'timed_out'
+  return result.status === 'ok' && result.response.ok && typeof result.value === 'string'
+    ? result.value
+    : 'unavailable'
 }
 
 /** Accept one anonymous report through challenge, publication, quota, and insertion gates. */
@@ -212,32 +237,51 @@ export async function handleReportRequest(
   request: Request,
   env: ReportEnv,
   fetcher: Fetcher = fetch,
+  timeoutMs: number = PUBLIC_ROUTE_POLICIES.report.timeoutMs,
 ): Promise<Response> {
-  if (request.method !== 'POST') return answer(405, 'failed')
+  const requestId = publicRequestId()
+  /** Return one classified report failure with privacy-safe diagnostics. */
+  const fail = (failure: 'invalid' | 'limited' | 'missing' | 'unavailable' | 'timed_out') =>
+    failureResponse(
+      answer(200, failure === 'unavailable' ? 'unavailable' : 'failed', requestId),
+      'report',
+      failure,
+      requestId,
+    )
+  if (request.method !== 'POST') return answer(405, 'failed', requestId)
   if (request.headers.get('content-type')?.split(';', 1)[0].trim() !== 'application/json') {
-    return answer(415, 'failed')
+    return answer(415, 'failed', requestId)
   }
+  const limiter = routeRateLimiter(env)
+  const admission = await limiter.allow(request, PUBLIC_ROUTE_POLICIES.report)
+  if (admission !== true) return fail(admission === 'unavailable' ? 'unavailable' : 'limited')
   if (
-    !database(env) ||
+    !supabaseCoordinates(env) ||
     !env.REPORT_INGRESS_TOKEN ||
     !env.TURNSTILE_SECRET_KEY ||
     !env.REPORT_FINGERPRINT_KEY ||
     !env.REPORT_ALLOWED_HOSTS
   ) {
-    return answer(503, 'unavailable')
+    return fail('unavailable')
   }
-  const parsed = await parseReport(request)
-  if (parsed === 'large') return answer(413, 'failed')
-  if (!parsed) return answer(400, 'failed')
+  const deadline = Date.now() + timeoutMs
+  const parsed = await parseReport(request, deadline)
+  if (parsed === 'large') return answer(413, 'failed', requestId)
+  if (parsed === 'timed_out') return fail('timed_out')
+  if (!parsed) return fail('invalid')
   const network = request.headers.get('cf-connecting-ip')?.trim()
-  if (!network || network.length > 64) return answer(400, 'failed')
-  if (!(await verifyChallenge(parsed, network, env, fetcher))) return answer(403, 'failed')
-  if (!(await publishedShare(parsed, env, fetcher))) return answer(404, 'failed')
-  const outcome = await insertReport(parsed, network, env, fetcher)
-  if (outcome === 'accepted') return answer(201, 'ok')
-  if (outcome === 'duplicate') return answer(409, 'failed')
-  if (outcome === 'share_limited' || outcome === 'network_limited') return answer(429, 'failed')
-  if (outcome === 'missing') return answer(404, 'failed')
-  if (outcome === 'invalid') return answer(400, 'failed')
-  return answer(503, 'unavailable')
+  if (!network || network.length > 64) return fail('invalid')
+  const challenge = await verifyChallenge(parsed, network, env, fetcher, deadline)
+  if (challenge === 'timed_out' || challenge === 'unavailable') return fail(challenge)
+  if (challenge === 'invalid') return answer(403, 'failed', requestId)
+  const published = await publishedShare(parsed, env, fetcher, deadline)
+  if (published !== 'ok') return fail(published)
+  const outcome = await insertReport(parsed, network, env, fetcher, deadline)
+  if (outcome === 'accepted') return answer(201, 'ok', requestId)
+  if (outcome === 'duplicate') return answer(409, 'failed', requestId)
+  if (outcome === 'share_limited' || outcome === 'network_limited') return fail('limited')
+  if (outcome === 'missing') return fail('missing')
+  if (outcome === 'invalid') return fail('invalid')
+  if (outcome === 'timed_out') return fail('timed_out')
+  return fail('unavailable')
 }

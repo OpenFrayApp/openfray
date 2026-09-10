@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Nicola Mustone
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { describeShare, type CardEnv } from '../../share-card/describe.ts'
+import { describeShareResult, type CardEnv } from '../../share-card/describe.ts'
 
 const CODE = 'k7mqx3rt9p'
 const ORIGIN = 'https://openfray.app/s/k7mqx3rt9p'
@@ -41,6 +41,12 @@ function envWith(row: unknown, overrides: Partial<CardEnv> = {}): CardEnv {
     },
     ...overrides,
   }
+}
+
+/** Return the card from a successful description or null for a bounded fallback. */
+async function describeShare(env: CardEnv, code: string, origin: string) {
+  const result = await describeShareResult(env, code, origin)
+  return result.status === 'ok' ? result.card : null
 }
 
 const encounter = {
@@ -250,6 +256,33 @@ describe('describeShare', () => {
         vi.fn(async () => new Response('nope', { status: 500 })),
       )
       expect(await describeShare(env, CODE, ORIGIN)).toBeNull()
+    })
+
+    it('classifies a stalled database lookup at the route deadline', async () => {
+      const env = envWith(encounter)
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          (_input, init) =>
+            new Promise((_resolve, reject) => {
+              init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), {
+                once: true,
+              })
+            }),
+        ),
+      )
+
+      expect(await describeShareResult(env, CODE, ORIGIN, 1)).toEqual({ status: 'timed_out' })
+    })
+
+    it('rejects an upstream share payload beyond its response ceiling', async () => {
+      const env = envWith(encounter)
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => new Response(`\"${'x'.repeat(70_000)}\"`)),
+      )
+
+      expect(await describeShareResult(env, CODE, ORIGIN)).toEqual({ status: 'unavailable' })
     })
   })
 })
