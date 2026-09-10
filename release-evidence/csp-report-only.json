@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "policySha256": "519fb8e0e49bfe9c6b516640d5a8a78e7d9bdf9c166ecb69f60bf26910146733",
+  "result": "passed",
+  "requiredPaths": ["console", "player-view", "published-share", "authentication", "assets"],
+  "exercises": ["script", "style", "connection", "frame", "resource"],
+  "unexplainedViolations": 0
+}

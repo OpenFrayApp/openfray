@@ -26,6 +26,23 @@ const SOURCE_CHECK = {
   command: 'node scripts/release-verification.mjs',
 }
 const SOURCE_REGISTRY_PATH = 'release-evidence/sources.json'
+const CSP_POLICY_PATH = 'cloudflare/_headers'
+const CSP_EVIDENCE_PATH = 'release-evidence/csp-report-only.json'
+const CSP_REPORTING_PATHS = ['security/csp-report.ts', 'functions/api/csp-reports.ts']
+const CSP_CHECK = {
+  id: 'privacy-safe-csp',
+  name: 'Privacy-safe Content Security Policy',
+  requirementIds: ['OH-1'],
+  command: 'node scripts/release-verification.mjs',
+}
+const CSP_REQUIRED_PATHS = new Set([
+  'console',
+  'player-view',
+  'published-share',
+  'authentication',
+  'assets',
+])
+const CSP_EXERCISES = new Set(['script', 'style', 'connection', 'frame', 'resource'])
 const REPOSITORIES = [
   { name: 'openfray', path: '.' },
   { name: 'console', path: 'console' },
@@ -373,6 +390,92 @@ function runEvidenceSourceCheck(root, environmentKind) {
   }
 }
 
+/** Validate the report-only CSP record against the exact enforced configuration. */
+function decodeCspEvidence(policyBytes, evidenceBytes, reportingConfiguration) {
+  const value = JSON.parse(evidenceBytes.toString('utf8'))
+  requireKeys(value, [
+    'schemaVersion',
+    'policySha256',
+    'result',
+    'requiredPaths',
+    'exercises',
+    'unexplainedViolations',
+  ])
+  if (
+    value.schemaVersion !== 1 ||
+    value.policySha256 !== sha256(policyBytes) ||
+    value.result !== 'passed' ||
+    value.unexplainedViolations !== 0
+  ) {
+    throw new Error('Invalid CSP report-only evidence')
+  }
+  const requiredPaths = requireTokenList(value.requiredPaths)
+  const exercises = requireTokenList(value.exercises)
+  if (
+    requiredPaths.length !== CSP_REQUIRED_PATHS.size ||
+    requiredPaths.some((path) => !CSP_REQUIRED_PATHS.has(path)) ||
+    exercises.length !== CSP_EXERCISES.size ||
+    exercises.some((exercise) => !CSP_EXERCISES.has(exercise))
+  ) {
+    throw new Error('Incomplete CSP report-only evidence')
+  }
+  const policy = policyBytes.toString('utf8')
+  if (
+    !policy.includes('Content-Security-Policy:') ||
+    policy.includes('Content-Security-Policy-Report-Only:') ||
+    !policy.includes('report-uri /api/csp-reports')
+  ) {
+    throw new Error('CSP is not safely enforced')
+  }
+  return {
+    configuration: { path: CSP_POLICY_PATH, sha256: sha256(policyBytes) },
+    reportOnlyEvidence: { path: CSP_EVIDENCE_PATH, sha256: sha256(evidenceBytes) },
+    reportingConfiguration,
+  }
+}
+
+/** Check that enforcement matches complete report-only and staged-exercise evidence. */
+function runCspCheck(root) {
+  const startedAt = new Date().toISOString()
+  const policyPath = resolve(root, CSP_POLICY_PATH)
+  const evidencePath = resolve(root, CSP_EVIDENCE_PATH)
+  let result = 'missing'
+  let evidence = null
+  const reportingAvailable = CSP_REPORTING_PATHS.every((path) => existsSync(resolve(root, path)))
+  if (existsSync(policyPath) && existsSync(evidencePath) && reportingAvailable) {
+    try {
+      const reportingConfiguration = CSP_REPORTING_PATHS.map((path) => ({
+        path,
+        sha256: sha256(readFileSync(resolve(root, path))),
+      }))
+      evidence = decodeCspEvidence(
+        readFileSync(policyPath),
+        readFileSync(evidencePath),
+        reportingConfiguration,
+      )
+      result = 'passed'
+    } catch {
+      result = 'failed'
+    }
+  }
+  return {
+    check: {
+      id: CSP_CHECK.id,
+      name: CSP_CHECK.name,
+      requirementIds: CSP_CHECK.requirementIds,
+      applicable: true,
+      command: CSP_CHECK.command,
+      result,
+      exitCode: null,
+      startedAt,
+      completedAt: new Date().toISOString(),
+    },
+    configuration: evidence?.configuration ?? null,
+    reportOnlyEvidence: evidence?.reportOnlyEvidence ?? null,
+    reportingConfiguration: evidence?.reportingConfiguration ?? [],
+  }
+}
+
 /** Decode the console-owned fixture projection without copying rejected values. */
 function decodeFixtureEvidence(serialized) {
   try {
@@ -494,6 +597,25 @@ function renderReport(manifest) {
       ? `| ${SOURCE_REGISTRY_PATH} | Missing |`
       : `| ${manifest.inputs.evidenceSourceRegistry.path} | ${manifest.inputs.evidenceSourceRegistry.sha256} |`,
     '',
+    '### Content Security Policy',
+    '',
+    '| Input | Path | SHA-256 |',
+    '| --- | --- | --- |',
+    manifest.inputs.contentSecurityPolicy === null
+      ? `| Enforced configuration | ${CSP_POLICY_PATH} | Missing |`
+      : `| Enforced configuration | ${manifest.inputs.contentSecurityPolicy.path} | ${manifest.inputs.contentSecurityPolicy.sha256} |`,
+    manifest.inputs.cspReportOnlyEvidence === null
+      ? `| Report-only evidence | ${CSP_EVIDENCE_PATH} | Missing |`
+      : `| Report-only evidence | ${manifest.inputs.cspReportOnlyEvidence.path} | ${manifest.inputs.cspReportOnlyEvidence.sha256} |`,
+  )
+  if (manifest.inputs.cspReportingConfiguration.length === 0) {
+    lines.push('| Reporting boundary | Missing | Missing |')
+  }
+  for (const source of manifest.inputs.cspReportingConfiguration) {
+    lines.push(`| Reporting boundary | ${source.path} | ${source.sha256} |`)
+  }
+  lines.push(
+    '',
     '### Provider baselines',
     '',
     '| Provider | Authority | Collection | Availability | Baseline SHA-256 |',
@@ -558,6 +680,7 @@ export function verifyRelease(options = {}) {
   const lockfiles = lockfileEvidence(settings.root)
   const fixtureCheck = runFixtureCheck(settings.root)
   const sourceCheck = runEvidenceSourceCheck(settings.root, settings.environment)
+  const cspCheck = runCspCheck(settings.root)
   const workingTreeClean = isCleanWorkspace(settings.root)
   const rollbackReady = rollbackTargetReady(
     settings.root,
@@ -572,9 +695,12 @@ export function verifyRelease(options = {}) {
     sourceCheck.environment !== null &&
     sourceCheck.providerBaselines.length > 0 &&
     sourceCheck.deviceCoverage.length > 0 &&
+    cspCheck.configuration !== null &&
+    cspCheck.reportOnlyEvidence !== null &&
+    cspCheck.reportingConfiguration.length === CSP_REPORTING_PATHS.length &&
     workingTreeClean &&
     rollbackReady
-  const checks = [fixtureCheck.check, sourceCheck.check]
+  const checks = [fixtureCheck.check, sourceCheck.check, cspCheck.check]
   const passed = inputsComplete && checks.every((check) => check.result === 'passed')
   const manifest = {
     schemaVersion: 1,
@@ -599,6 +725,9 @@ export function verifyRelease(options = {}) {
       lockfiles,
       fixtures: fixtureCheck.fixtures,
       evidenceSourceRegistry: sourceCheck.registry,
+      contentSecurityPolicy: cspCheck.configuration,
+      cspReportOnlyEvidence: cspCheck.reportOnlyEvidence,
+      cspReportingConfiguration: cspCheck.reportingConfiguration,
       providerBaselines: sourceCheck.providerBaselines,
       deviceCoverage: sourceCheck.deviceCoverage,
       workingTreeClean,

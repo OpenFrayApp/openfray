@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { PUBLICATION_SOURCE_MANIFEST } from '../../console/src/publication/index.ts'
 
 const SCRIPT = resolve(__dirname, '../../scripts/assemble-site.mjs')
+const DEPLOYMENT_HEADERS = readFileSync(resolve(__dirname, '../../cloudflare/_headers'), 'utf8')
 let dir: string
 
 /** Drop a file into the fixture, creating parent folders. */
@@ -34,6 +35,8 @@ beforeEach(() => {
   file('site/dist/lab/index.html', '<html>lab</html>')
   file('site/dist/lab/loop.mp4', 'mp4')
   file('site/dist/sitemap-index.xml', '<sitemapindex>site-only</sitemapindex>')
+  file('site/dist/_headers', 'stale site-owned headers')
+  file('cloudflare/_headers', DEPLOYMENT_HEADERS)
   file('handbook/dist/index.html', '<html>docs</html>')
   file('brand/fonts/inter-500.ttf', 'ttf')
   file('brand/fonts/LICENSE.txt', 'the SIL Open Font License')
@@ -131,6 +134,19 @@ describe('assemble-site', () => {
 
   it('removes /lab, the section-component demo, assets included', () => {
     expect(existsSync(join(dir, 'dist/lab'))).toBe(false)
+  })
+
+  it('ships the deployment-owned enforced security headers', () => {
+    const headers = readFileSync(join(dir, 'dist/_headers'), 'utf8')
+    expect(headers).toBe(DEPLOYMENT_HEADERS)
+    expect(headers).toContain('Content-Security-Policy:')
+    expect(headers).toContain("script-src 'self' 'unsafe-inline'")
+    expect(headers).toContain("style-src 'self' 'unsafe-inline'")
+    expect(headers).toContain("connect-src 'self'")
+    expect(headers).toContain('frame-src https://challenges.cloudflare.com')
+    expect(headers).toContain("object-src 'none'")
+    expect(headers).toContain('report-uri /api/csp-reports')
+    expect(headers).not.toContain('Content-Security-Policy-Report-Only')
   })
 
   it('writes the Pages redirects: slash normalisation, code rewrites, moved docs URLs', () => {
