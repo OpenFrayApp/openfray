@@ -21,6 +21,69 @@ const PRIVATE_VALUES = {
 
 interface FixtureOptions {
   validator?: false | 'pass' | 'reject-private-values' | 'private-metadata'
+  registry?: false | ((registry: Record<string, unknown>) => void)
+}
+
+/** Return a complete synthetic evidence-source registry. */
+function evidenceSourceRegistry(): Record<string, unknown> {
+  return {
+    schemaVersion: 1,
+    environments: [
+      {
+        kind: 'local',
+        identity: 'openfray-local',
+        authority: 'maintainer',
+        probePolicy: 'local-only',
+      },
+      {
+        kind: 'staging',
+        identity: 'openfray-staging',
+        authority: 'maintainer',
+        probePolicy: 'authorized-staging-only',
+      },
+      {
+        kind: 'production',
+        identity: 'openfray-production',
+        authority: 'maintainer',
+        probePolicy: 'separate-written-authorization-required',
+      },
+    ],
+    providerBaselines: [
+      {
+        id: 'supabase',
+        ownerRepository: 'console',
+        authority: { kind: 'source-file', path: 'console/provider-baseline.json' },
+        collectionMethod: 'mixed',
+        unsupportedManualChecks: ['dashboard-review'],
+        availability: 'available',
+        unavailableReason: null,
+        freshness: {
+          maximumAgeDays: 90,
+          invalidatedBy: [
+            'source-commit',
+            'lockfile',
+            'migration-head',
+            'fixture-hashes',
+            'baseline-hash',
+            'environment-identity',
+          ],
+        },
+      },
+    ],
+    deviceCoverage: [
+      {
+        id: 'windows-firefox-nvda',
+        deviceClass: 'desktop',
+        operatingSystem: 'supported-windows',
+        browser: 'current-firefox',
+        assistiveTechnology: 'nvda',
+        inputs: ['keyboard'],
+        evidenceMethod: 'physical-manual',
+        availability: 'unavailable',
+        unavailableReason: 'access-not-recorded',
+      },
+    ],
+  }
 }
 
 /** Write a synthetic fixture file and create its parent directories. */
@@ -64,6 +127,7 @@ function createWorkspaceFixture(options: FixtureOptions = {}): string {
         : `console.log(${JSON.stringify(JSON.stringify(safeProjection))})`
 
   writeFixtureFile(root, 'console/private-input.json', authored)
+  writeFixtureFile(root, 'console/provider-baseline.json', '{"version":1}\n')
   if (options.validator !== false) {
     writeFixtureFile(root, 'console/scripts/validate-hardening-fixtures.mjs', validator)
   }
@@ -76,6 +140,11 @@ function createWorkspaceFixture(options: FixtureOptions = {}): string {
 
   writeFixtureFile(root, 'package.json', JSON.stringify({ name: 'release-fixture', private: true }))
   writeFixtureFile(root, 'package-lock.json', '{"lockfileVersion":3}\n')
+  if (options.registry !== false) {
+    const registry = evidenceSourceRegistry()
+    options.registry?.(registry)
+    writeFixtureFile(root, 'release-evidence/sources.json', `${JSON.stringify(registry)}\n`)
+  }
   initializeRepository(root)
   return root
 }
@@ -113,7 +182,9 @@ describe('release verification', () => {
       approver: 'pending',
       rollbackTarget: null,
       environment: {
-        identity: 'local',
+        kind: 'local',
+        identity: 'openfray-local',
+        probePolicy: 'local-only',
       },
       checks: [
         {
@@ -122,6 +193,12 @@ describe('release verification', () => {
           applicable: true,
           command:
             'node console/scripts/validate-hardening-fixtures.mjs console/tests/fixtures/hardening/catalog.json --evidence',
+          result: 'passed',
+        },
+        {
+          id: 'release-evidence-sources',
+          requirementIds: ['EF-3'],
+          applicable: true,
           result: 'passed',
         },
       ],
@@ -147,7 +224,26 @@ describe('release verification', () => {
         sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
       },
     ])
+    expect(manifest.inputs.evidenceSourceRegistry).toEqual({
+      path: 'release-evidence/sources.json',
+      sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+    })
+    expect(manifest.inputs.providerBaselines).toEqual([
+      expect.objectContaining({
+        id: 'supabase',
+        authoritySha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+        sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+      }),
+    ])
+    expect(manifest.inputs.deviceCoverage).toEqual([
+      expect.objectContaining({
+        id: 'windows-firefox-nvda',
+        availability: 'unavailable',
+      }),
+    ])
     expect(report).toContain('# Release verification report')
+    expect(report).toContain('### Provider baselines')
+    expect(report).toContain('### Physical-device coverage')
     expect(report).toContain(
       '| EF-1 | Canonical hardening fixtures | `node console/scripts/validate-hardening-fixtures.mjs console/tests/fixtures/hardening/catalog.json --evidence` | Passed |',
     )
@@ -159,13 +255,13 @@ describe('release verification', () => {
 
     expect(result.status).toBe(1)
     expect(manifest.result).toBe('failed')
-    expect(manifest.checks).toEqual([
+    expect(manifest.checks).toContainEqual(
       expect.objectContaining({
         id: 'canonical-hardening-fixtures',
         applicable: true,
         result: 'missing',
       }),
-    ])
+    )
     expect(report).toContain(
       '| EF-1 | Canonical hardening fixtures | `node console/scripts/validate-hardening-fixtures.mjs console/tests/fixtures/hardening/catalog.json --evidence` | Missing |',
     )
@@ -203,6 +299,87 @@ describe('release verification', () => {
     expect(result.status).toBe(1)
     expect(manifest.rollbackTarget).toBeNull()
     expect(manifest.inputs.rollbackReady).toBe(false)
+    expect(manifest.environment).toMatchObject({
+      identity: 'openfray-production',
+      probePolicy: 'separate-written-authorization-required',
+    })
     expect(report).toContain('- **Rollback target:** Missing')
+  })
+
+  it('selects distinct recorded identities for every environment', () => {
+    const root = createWorkspaceFixture()
+    const local = runVerification(root).manifest.environment
+    const staging = runVerification(root, ['--environment', 'staging']).manifest.environment
+    const production = runVerification(root, ['--environment', 'production']).manifest.environment
+
+    expect([local.identity, staging.identity, production.identity]).toEqual([
+      'openfray-local',
+      'openfray-staging',
+      'openfray-production',
+    ])
+    expect(new Set([local.identity, staging.identity, production.identity]).size).toBe(3)
+  })
+
+  it('records missing evidence-source registry as an applicable failed gate', () => {
+    const root = createWorkspaceFixture({ registry: false })
+    const { manifest, report, result } = runVerification(root)
+
+    expect(result.status).toBe(1)
+    expect(manifest.checks).toContainEqual(
+      expect.objectContaining({ id: 'release-evidence-sources', result: 'missing' }),
+    )
+    expect(manifest.inputs.evidenceSourceRegistry).toBeNull()
+    expect(report).toContain('| EF-3 | Release evidence sources')
+    expect(report).toContain('| release-evidence/sources.json | Missing |')
+  })
+
+  it('rejects duplicate environment identities without copying registry values', () => {
+    const root = createWorkspaceFixture({
+      registry(registry) {
+        const environments = registry.environments as Array<Record<string, unknown>>
+        environments[1].identity = environments[0].identity
+        environments[2].privateValue = PRIVATE_VALUES.account
+      },
+    })
+    const { manifest, report, result } = runVerification(root)
+    const evidence = `${JSON.stringify(manifest)}\n${report}`
+
+    expect(result.status).toBe(1)
+    expect(manifest.checks).toContainEqual(
+      expect.objectContaining({ id: 'release-evidence-sources', result: 'failed' }),
+    )
+    expect(manifest.inputs.providerBaselines).toEqual([])
+    expect(evidence).not.toContain(PRIVATE_VALUES.account)
+  })
+
+  it('rejects privacy-sensitive source identifiers without copying them', () => {
+    const root = createWorkspaceFixture({
+      registry(registry) {
+        const providers = registry.providerBaselines as Array<Record<string, unknown>>
+        providers[0].id = PRIVATE_VALUES.capability
+      },
+    })
+    const { manifest, report, result } = runVerification(root)
+    const evidence = `${JSON.stringify(manifest)}\n${report}`
+
+    expect(result.status).toBe(1)
+    expect(manifest.checks).toContainEqual(
+      expect.objectContaining({ id: 'release-evidence-sources', result: 'failed' }),
+    )
+    expect(evidence).not.toContain(PRIVATE_VALUES.capability)
+  })
+
+  it('changes a provider baseline hash when its reviewed authority changes', () => {
+    const firstRoot = createWorkspaceFixture()
+    const secondRoot = createWorkspaceFixture({
+      registry(registry) {
+        const providers = registry.providerBaselines as Array<Record<string, unknown>>
+        providers[0].unsupportedManualChecks = ['dashboard-review', 'redirect-review']
+      },
+    })
+
+    const first = runVerification(firstRoot).manifest.inputs.providerBaselines[0].sha256
+    const second = runVerification(secondRoot).manifest.inputs.providerBaselines[0].sha256
+    expect(first).not.toBe(second)
   })
 })
