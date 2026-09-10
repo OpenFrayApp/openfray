@@ -2,10 +2,12 @@
 // Copyright (C) 2026 Nicola Mustone
 
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { PUBLICATION_SOURCE_MANIFEST } from '../../console/src/publication/index.ts'
 
 const SCRIPT = resolve(__dirname, '../../scripts/assemble-site.mjs')
 let dir: string
@@ -51,10 +53,15 @@ beforeEach(() => {
       '</head><body>app</body></html>',
     ].join(''),
   )
-  file(
-    'console/dist/console/compendium/srd-creatures.json',
-    JSON.stringify([{ id: 'srd-5.2:goblin', name: 'Goblin', size: 'Small', type: 'humanoid' }]),
-  )
+  for (const source of PUBLICATION_SOURCE_MANIFEST.sources) {
+    const fileName = source.indexPath.replace(/\.index\.json$/, '.json')
+    const id = source.id === 'srd-5.2' ? 'srd-5.2:goblin' : `${source.id}:fixture`
+    const name = source.id === 'srd-5.2' ? 'Goblin' : 'Fixture creature'
+    file(
+      `console/dist/console/compendium/${fileName}`,
+      JSON.stringify([{ id, name, size: 'Small', type: 'humanoid' }]),
+    )
+  }
   file(
     'console/dist/console/compendium/srd-spells.json',
     JSON.stringify([{ id: 'srd-5.2:fireball' }]),
@@ -93,6 +100,26 @@ describe('assemble-site', () => {
     expect(index['srd-5.2:goblin']).toEqual({ name: 'Goblin', size: 'Small', type: 'humanoid' })
     // Spells are never on a card, so a book of them gets no sidecar.
     expect(existsSync(join(dir, 'dist/console/compendium/srd-spells.index.json'))).toBe(false)
+  })
+
+  it('writes independently versioned publication evidence with an exact manifest hash', () => {
+    const manifestBytes = readFileSync(
+      join(dir, 'dist/publication-deployment-manifest.json'),
+      'utf8',
+    )
+    const manifest = JSON.parse(manifestBytes)
+    expect(manifest).toMatchObject({
+      deploymentManifestVersion: 1,
+      publicationInterfaceVersion: 1,
+      publishedShareSchemaVersion: 1,
+      sourceManifestVersion: 1,
+    })
+    expect(manifest.artifacts.sourceIndexes).toHaveLength(
+      PUBLICATION_SOURCE_MANIFEST.sources.length,
+    )
+    expect(
+      readFileSync(join(dir, 'dist/publication-deployment-manifest.sha256'), 'utf8').trim(),
+    ).toBe(createHash('sha256').update(manifestBytes).digest('hex'))
   })
 
   // Satori draws the share cards and needs real font files. They are served as assets, and

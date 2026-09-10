@@ -1,0 +1,250 @@
+{
+  "schemaVersion": 1,
+  "environments": [
+    {
+      "kind": "local",
+      "identity": "openfray-local",
+      "authority": "maintainer",
+      "probePolicy": "local-only"
+    },
+    {
+      "kind": "staging",
+      "identity": "openfray-staging",
+      "authority": "maintainer",
+      "probePolicy": "authorized-staging-only"
+    },
+    {
+      "kind": "production",
+      "identity": "openfray-production",
+      "authority": "maintainer",
+      "probePolicy": "separate-written-authorization-required"
+    }
+  ],
+  "providerBaselines": [
+    {
+      "id": "supabase",
+      "ownerRepository": "console",
+      "authority": {
+        "kind": "source-file",
+        "path": "console/supabase/hosted-config.expected.json"
+      },
+      "collectionMethod": "mixed",
+      "unsupportedManualChecks": ["auth-oauth-only", "auth-redirect-allowlist", "report-webhooks"],
+      "availability": "available",
+      "unavailableReason": null,
+      "freshness": {
+        "maximumAgeDays": 90,
+        "invalidatedBy": [
+          "source-commit",
+          "lockfile",
+          "migration-head",
+          "fixture-hashes",
+          "baseline-hash",
+          "environment-identity"
+        ]
+      }
+    },
+    {
+      "id": "cloudflare-pages",
+      "ownerRepository": "openfray",
+      "authority": {
+        "kind": "provider-dashboard",
+        "path": null
+      },
+      "collectionMethod": "manual",
+      "unsupportedManualChecks": [
+        "build-configuration",
+        "environment-bindings",
+        "production-access"
+      ],
+      "availability": "unavailable",
+      "unavailableReason": "access-not-recorded",
+      "freshness": {
+        "maximumAgeDays": 90,
+        "invalidatedBy": [
+          "source-commit",
+          "lockfile",
+          "migration-head",
+          "fixture-hashes",
+          "baseline-hash",
+          "environment-identity"
+        ]
+      }
+    },
+    {
+      "id": "cloudflare-r2",
+      "ownerRepository": "openfray",
+      "authority": {
+        "kind": "provider-dashboard",
+        "path": null
+      },
+      "collectionMethod": "manual",
+      "unsupportedManualChecks": ["backup-bucket-policy", "retention-policy", "storage-access"],
+      "availability": "unavailable",
+      "unavailableReason": "access-not-recorded",
+      "freshness": {
+        "maximumAgeDays": 90,
+        "invalidatedBy": [
+          "source-commit",
+          "lockfile",
+          "migration-head",
+          "fixture-hashes",
+          "baseline-hash",
+          "environment-identity"
+        ]
+      }
+    },
+    {
+      "id": "github",
+      "ownerRepository": "openfray",
+      "authority": {
+        "kind": "provider-dashboard",
+        "path": null
+      },
+      "collectionMethod": "manual",
+      "unsupportedManualChecks": [
+        "protected-environments",
+        "repository-security",
+        "workflow-permissions"
+      ],
+      "availability": "unavailable",
+      "unavailableReason": "access-not-recorded",
+      "freshness": {
+        "maximumAgeDays": 90,
+        "invalidatedBy": [
+          "source-commit",
+          "lockfile",
+          "migration-head",
+          "fixture-hashes",
+          "baseline-hash",
+          "environment-identity"
+        ]
+      }
+    },
+    {
+      "id": "oauth",
+      "ownerRepository": "console",
+      "authority": {
+        "kind": "provider-dashboard",
+        "path": null
+      },
+      "collectionMethod": "manual",
+      "unsupportedManualChecks": ["discord-provider", "google-provider", "redirect-allowlist"],
+      "availability": "unavailable",
+      "unavailableReason": "access-not-recorded",
+      "freshness": {
+        "maximumAgeDays": 90,
+        "invalidatedBy": [
+          "source-commit",
+          "lockfile",
+          "migration-head",
+          "fixture-hashes",
+          "baseline-hash",
+          "environment-identity"
+        ]
+      }
+    },
+    {
+      "id": "fathom",
+      "ownerRepository": "openfray",
+      "authority": {
+        "kind": "provider-dashboard",
+        "path": null
+      },
+      "collectionMethod": "manual",
+      "unsupportedManualChecks": ["privacy-settings", "site-registration"],
+      "availability": "unavailable",
+      "unavailableReason": "access-not-recorded",
+      "freshness": {
+        "maximumAgeDays": 90,
+        "invalidatedBy": [
+          "source-commit",
+          "lockfile",
+          "migration-head",
+          "fixture-hashes",
+          "baseline-hash",
+          "environment-identity"
+        ]
+      }
+    }
+  ],
+  "deviceCoverage": [
+    {
+      "id": "ipados-safari-voiceover",
+      "deviceClass": "tablet",
+      "operatingSystem": "supported-ipados",
+      "browser": "current-safari",
+      "assistiveTechnology": "voiceover",
+      "inputs": ["touch"],
+      "evidenceMethod": "physical-manual",
+      "availability": "unavailable",
+      "unavailableReason": "access-not-recorded"
+    },
+    {
+      "id": "macos-safari-voiceover",
+      "deviceClass": "desktop",
+      "operatingSystem": "supported-macos",
+      "browser": "current-safari",
+      "assistiveTechnology": "voiceover",
+      "inputs": ["keyboard", "trackpad"],
+      "evidenceMethod": "physical-manual",
+      "availability": "unavailable",
+      "unavailableReason": "access-not-recorded"
+    },
+    {
+      "id": "windows-chrome-nvda",
+      "deviceClass": "desktop",
+      "operatingSystem": "supported-windows",
+      "browser": "current-chrome",
+      "assistiveTechnology": "nvda",
+      "inputs": ["keyboard", "mouse"],
+      "evidenceMethod": "physical-manual",
+      "availability": "unavailable",
+      "unavailableReason": "access-not-recorded"
+    },
+    {
+      "id": "windows-firefox-nvda",
+      "deviceClass": "desktop",
+      "operatingSystem": "supported-windows",
+      "browser": "current-firefox",
+      "assistiveTechnology": "nvda",
+      "inputs": ["keyboard", "mouse"],
+      "evidenceMethod": "physical-manual",
+      "availability": "unavailable",
+      "unavailableReason": "access-not-recorded"
+    },
+    {
+      "id": "windows-edge",
+      "deviceClass": "desktop",
+      "operatingSystem": "supported-windows",
+      "browser": "current-edge",
+      "assistiveTechnology": null,
+      "inputs": ["keyboard", "mouse", "pen"],
+      "evidenceMethod": "physical-manual",
+      "availability": "unavailable",
+      "unavailableReason": "access-not-recorded"
+    },
+    {
+      "id": "macos-firefox",
+      "deviceClass": "desktop",
+      "operatingSystem": "supported-macos",
+      "browser": "current-firefox",
+      "assistiveTechnology": null,
+      "inputs": ["keyboard", "trackpad"],
+      "evidenceMethod": "physical-manual",
+      "availability": "unavailable",
+      "unavailableReason": "access-not-recorded"
+    },
+    {
+      "id": "android-chrome-talkback",
+      "deviceClass": "phone",
+      "operatingSystem": "supported-android",
+      "browser": "current-chrome",
+      "assistiveTechnology": "talkback",
+      "inputs": ["touch"],
+      "evidenceMethod": "physical-manual",
+      "availability": "unavailable",
+      "unavailableReason": "access-not-recorded"
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Nicola Mustone
 
-import { formatCr } from '../console/src/compendium/format.ts'
+import { formatCardChallenge } from './card.ts'
 import {
   bylineLine,
   chipLabel,
@@ -277,7 +277,7 @@ function encounterBody(card: EncounterCard): CardNode[] {
 /**
  * The type line and the two numbers, under the creature's name.
  *
- * A stat block saved without a challenge rating drops the whole row: `formatCr` answers an
+ * A stat block saved without a challenge rating drops the whole row: the formatter answers an
  * em dash, which is right on a stat block and looks broken on a card. The award is only ever
  * the plain one, never `xpLair` — a shared stat block is not in its lair.
  */
@@ -293,7 +293,7 @@ function creatureBody(card: CreatureCard): CardNode[] {
     nodes.push(
       row(
         { marginTop: '44px', alignItems: 'flex-start' },
-        stat('CHALLENGE', formatCr(card.cr)),
+        stat('CHALLENGE', formatCardChallenge(card.cr)),
         card.xp != null && stat('XP', card.xp.toLocaleString('en-US')),
       ),
     )
