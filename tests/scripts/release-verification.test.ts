@@ -22,6 +22,7 @@ const PRIVATE_VALUES = {
 interface FixtureOptions {
   validator?: false | 'pass' | 'reject-private-values' | 'private-metadata'
   registry?: false | ((registry: Record<string, unknown>) => void)
+  cspEvidence?: false | 'stale'
 }
 
 /** Return a complete synthetic evidence-source registry. */
@@ -140,6 +141,27 @@ function createWorkspaceFixture(options: FixtureOptions = {}): string {
 
   writeFixtureFile(root, 'package.json', JSON.stringify({ name: 'release-fixture', private: true }))
   writeFixtureFile(root, 'package-lock.json', '{"lockfileVersion":3}\n')
+  const csp = "/*\n  Content-Security-Policy: default-src 'self'; report-uri /api/csp-reports\n"
+  writeFixtureFile(root, 'cloudflare/_headers', csp)
+  writeFixtureFile(root, 'security/csp-report.ts', 'export const reportBoundary = true\n')
+  writeFixtureFile(root, 'functions/api/csp-reports.ts', 'export const reportRoute = true\n')
+  if (options.cspEvidence !== false) {
+    writeFixtureFile(
+      root,
+      'release-evidence/csp-report-only.json',
+      `${JSON.stringify({
+        schemaVersion: 1,
+        policySha256:
+          options.cspEvidence === 'stale'
+            ? '0'.repeat(64)
+            : createHash('sha256').update(csp).digest('hex'),
+        result: 'passed',
+        requiredPaths: ['console', 'player-view', 'published-share', 'authentication', 'assets'],
+        exercises: ['script', 'style', 'connection', 'frame', 'resource'],
+        unexplainedViolations: 0,
+      })}\n`,
+    )
+  }
   if (options.registry !== false) {
     const registry = evidenceSourceRegistry()
     options.registry?.(registry)
@@ -201,6 +223,12 @@ describe('release verification', () => {
           applicable: true,
           result: 'passed',
         },
+        {
+          id: 'privacy-safe-csp',
+          requirementIds: ['OH-1'],
+          applicable: true,
+          result: 'passed',
+        },
       ],
     })
     expect(manifest.inputs.repositories.map((entry: { name: string }) => entry.name)).toEqual([
@@ -228,6 +256,24 @@ describe('release verification', () => {
       path: 'release-evidence/sources.json',
       sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
     })
+    expect(manifest.inputs.contentSecurityPolicy).toEqual({
+      path: 'cloudflare/_headers',
+      sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+    })
+    expect(manifest.inputs.cspReportOnlyEvidence).toEqual({
+      path: 'release-evidence/csp-report-only.json',
+      sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+    })
+    expect(manifest.inputs.cspReportingConfiguration).toEqual([
+      {
+        path: 'security/csp-report.ts',
+        sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+      },
+      {
+        path: 'functions/api/csp-reports.ts',
+        sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+      },
+    ])
     expect(manifest.inputs.providerBaselines).toEqual([
       expect.objectContaining({
         id: 'supabase',
@@ -290,6 +336,24 @@ describe('release verification', () => {
     expect(manifest.checks[0].result).toBe('failed')
     expect(manifest.inputs.fixtures).toEqual([])
     expect(evidence).not.toContain(PRIVATE_VALUES.secret)
+  })
+
+  it.each([
+    ['missing', false],
+    ['stale', 'stale'],
+  ] as const)('fails when CSP report-only evidence is %s', (_label, cspEvidence) => {
+    const root = createWorkspaceFixture({ cspEvidence })
+    const { manifest, report, result } = runVerification(root)
+
+    expect(result.status).toBe(1)
+    expect(manifest.checks).toContainEqual(
+      expect.objectContaining({
+        id: 'privacy-safe-csp',
+        applicable: true,
+        result: cspEvidence === false ? 'missing' : 'failed',
+      }),
+    )
+    expect(report).toContain('| OH-1 | Privacy-safe Content Security Policy')
   })
 
   it('requires an immutable rollback target for production evidence', () => {

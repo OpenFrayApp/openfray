@@ -28,6 +28,10 @@ import { createPublicationDeploymentManifest } from './publication-deployment-ma
 // Site root (/) → the Astro-built marketing site (home, privacy, terms, 404).
 cpSync('site/dist', 'dist', { recursive: true })
 
+// Response policy belongs to the assembled deployment because it governs all three
+// surfaces. Overwrite the site's build copy so a stale submodule header cannot ship.
+copyFileSync('cloudflare/_headers', 'dist/_headers')
+
 // /console → the Vite-built app. The console workspace builds into its own
 // dist/console so the base path survives; copy it under the same path here.
 cpSync('console/dist/console', 'dist/console', { recursive: true })
