@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "environment": "staging",
+  "authorizedBy": "maintainer",
+  "recordedAt": "2026-09-11T06:33:21Z",
+  "applicationCommit": "4765b0c81e8fcb6e28d5a43f9fa239e64f6fae37",
+  "rateLimits": [
+    {
+      "route": "share-html",
+      "configuredThreshold": 120,
+      "windowSeconds": 60,
+      "firstLimitedRequest": 213,
+      "safetyCap": 300,
+      "result": "passed"
+    },
+    {
+      "route": "share-image",
+      "configuredThreshold": 30,
+      "windowSeconds": 60,
+      "firstLimitedRequest": 51,
+      "safetyCap": 80,
+      "result": "passed"
+    },
+    {
+      "route": "anonymous-report",
+      "configuredThreshold": 10,
+      "windowSeconds": 60,
+      "firstLimitedRequest": 20,
+      "safetyCap": 30,
+      "result": "passed",
+      "admittedRequestStatus": 503
+    },
+    {
+      "route": "csp-report",
+      "configuredThreshold": 60,
+      "windowSeconds": 60,
+      "firstLimitedRequest": 103,
+      "safetyCap": 150,
+      "result": "passed"
+    }
+  ],
+  "timeouts": [
+    {
+      "route": "share-html",
+      "status": 504,
+      "elapsedMilliseconds": 2262,
+      "observationCeilingMilliseconds": 3000,
+      "opaqueRequestId": "valid",
+      "result": "passed"
+    },
+    {
+      "route": "share-image",
+      "status": 504,
+      "elapsedMilliseconds": 4177,
+      "observationCeilingMilliseconds": 5000,
+      "opaqueRequestId": "valid",
+      "result": "passed"
+    }
+  ],
+  "cleanup": {
+    "previewOverridesRemoved": true,
+    "restoration": [
+      {
+        "route": "share-html",
+        "status": 404,
+        "elapsedMilliseconds": 767,
+        "opaqueRequestId": "valid",
+        "result": "passed"
+      },
+      {
+        "route": "share-image",
+        "status": 404,
+        "elapsedMilliseconds": 234,
+        "opaqueRequestId": "valid",
+        "result": "passed"
+      }
+    ],
+    "temporaryDependencyDeleted": true
+  },
+  "excluded": [
+    "urls",
+    "share-capabilities",
+    "network-addresses",
+    "request-bodies",
+    "account-identifiers",
+    "credentials",
+    "provider-responses",
+    "raw-diagnostics"
+  ]
+}
