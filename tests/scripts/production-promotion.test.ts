@@ -12,6 +12,7 @@ const DEPLOYMENT_RECORD_SCRIPT = resolve(
   __dirname,
   '../../scripts/production-deployment-record.mjs',
 )
+const ENVIRONMENT_APPROVAL_SCRIPT = resolve(__dirname, '../../scripts/environment-approval.mjs')
 const ATTESTATION_SCRIPT = resolve(__dirname, '../../scripts/staging-attestation.mjs')
 const roots: string[] = []
 
@@ -144,6 +145,23 @@ afterEach(() => {
 })
 
 describe('production promotion', () => {
+  it('records the actual reviewer for the selected protected environment', () => {
+    const reviews = [
+      {
+        environments: [{ name: 'production' }],
+        state: 'approved',
+        user: { login: 'release-reviewer' },
+      },
+    ]
+    const result = spawnSync(process.execPath, [ENVIRONMENT_APPROVAL_SCRIPT, 'production'], {
+      input: JSON.stringify(reviews),
+      encoding: 'utf8',
+    })
+
+    expect(result.status).toBe(0)
+    expect(result.stdout.trim()).toBe('PROMOTION_APPROVER=release-reviewer')
+  })
+
   it('allows an ordinary release without staging matrices', () => {
     const { root, rollbackTarget } = createWorkspace('ordinary')
     const { manifest, result } = runPromotion(root, rollbackTarget)

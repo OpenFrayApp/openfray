@@ -4,14 +4,12 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { optionPairs } from './promotion-contract.mjs'
 
 /** Parse the bounded deployment-result command-line interface. */
 function parseOptions(arguments_) {
   const options = {}
-  for (let index = 0; index < arguments_.length; index += 2) {
-    const option = arguments_[index]
-    const value = arguments_[index + 1]
-    if (typeof value !== 'string') throw new Error(`Missing value for ${option}`)
+  for (const [option, value] of optionPairs(arguments_)) {
     if (option === '--manifest') options.manifest = value
     else if (option === '--result' && new Set(['passed', 'failed']).has(value)) {
       options.result = value

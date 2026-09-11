@@ -3,6 +3,7 @@
 name: Stage release candidate
 
 permissions:
+  actions: read
   contents: read
 
 on:
@@ -56,15 +57,12 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
-      STAGING_APPROVER: ${{ vars.STAGING_APPROVER }}
-      STAGING_ENVIRONMENT_ID: ${{ vars.STAGING_ENVIRONMENT_ID }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ inputs.candidate_commit }}
           fetch-depth: 0
           submodules: recursive
-      - run: git submodule foreach git fetch --no-tags origin main
       - run: npm ci
       - run: npm run test
       - run: npm run build
@@ -74,13 +72,34 @@ jobs:
             --project-name "$CLOUDFLARE_PAGES_PROJECT" \
             --branch staging \
             --commit-hash "${{ inputs.candidate_commit }}"
+
+  attest:
+    needs: stage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging-attestation
+    env:
+      GH_TOKEN: ${{ github.token }}
+      STAGING_ENVIRONMENT_ID: ${{ vars.STAGING_ENVIRONMENT_ID }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ inputs.candidate_commit }}
+          fetch-depth: 0
+          submodules: recursive
+      - run: git submodule foreach git fetch --no-tags origin main
+      - name: Record the environment reviewer
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/approvals" \
+            | node scripts/environment-approval.mjs staging-attestation \
+            >> "$GITHUB_ENV"
       - name: Record reviewed staging results
         run: |
           npm run attest:staging -- \
             --output .artifacts/staging/staging-release-attestation.json \
             --rollback-target "${{ inputs.rollback_target }}" \
             --environment "$STAGING_ENVIRONMENT_ID" \
-            --approver "$STAGING_APPROVER" \
+            --approver "$PROMOTION_APPROVER" \
             --migration "${{ inputs.migration }}" \
             --authentication "${{ inputs.authentication }}" \
             --row-level-security "${{ inputs.row_level_security }}" \

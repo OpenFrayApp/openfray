@@ -6,10 +6,14 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import {
+  PROMOTION_BOUNDARIES,
+  SAFE_PROMOTION_IDENTITY,
+  optionPairs,
+} from './promotion-contract.mjs'
 
 const REPOSITORIES = ['openfray', 'console', 'site', 'handbook']
 const COMMIT = /^[0-9a-f]{40}$/
-const SAFE_IDENTITY = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/
 const MAX_ATTESTATION_AGE_MS = 7 * 24 * 60 * 60 * 1000
 const CONFIGURATION_PATHS = [
   { repository: 'openfray', path: 'package-lock.json' },
@@ -38,7 +42,7 @@ const ROOT_CRITICAL_PATHS = [
   {
     boundary: 'sharing',
     pattern:
-      /^(\.github\/workflows\/(?:production-promotion|staging-candidate)\.yml|cloudflare\/_headers|functions\/s\/|share-card\/|public-boundary\/|rate-limit-worker\/|report-boundary\/|functions\/api\/(?:csp-reports|reports)\.ts|scripts\/(?:production-promotion|staging-attestation)\.mjs|security\/)/,
+      /^(\.github\/workflows\/(?:production-promotion|staging-candidate)\.yml|cloudflare\/_headers|functions\/s\/|share-card\/|public-boundary\/|rate-limit-worker\/|report-boundary\/|functions\/api\/(?:csp-reports|reports)\.ts|scripts\/(?:environment-approval|production-(?:deployment-record|promotion)|promotion-contract|staging-attestation)\.mjs|security\/)/,
   },
 ]
 
@@ -62,16 +66,14 @@ function parseOptions(arguments_) {
     stagingEnvironment: null,
     stagingAttestation: null,
   }
-  for (let index = 0; index < arguments_.length; index += 2) {
-    const option = arguments_[index]
-    const value = arguments_[index + 1]
-    if (typeof value !== 'string') throw new Error(`Missing value for ${option}`)
+  for (const [option, value] of optionPairs(arguments_)) {
     if (option === '--output') options.output = value
     else if (option === '--rollback-target' && COMMIT.test(value)) options.rollbackTarget = value
-    else if (option === '--approver' && SAFE_IDENTITY.test(value)) options.approver = value
-    else if (option === '--production-environment' && SAFE_IDENTITY.test(value)) {
+    else if (option === '--approver' && SAFE_PROMOTION_IDENTITY.test(value)) {
+      options.approver = value
+    } else if (option === '--production-environment' && SAFE_PROMOTION_IDENTITY.test(value)) {
       options.productionEnvironment = value
-    } else if (option === '--staging-environment' && SAFE_IDENTITY.test(value)) {
+    } else if (option === '--staging-environment' && SAFE_PROMOTION_IDENTITY.test(value)) {
       options.stagingEnvironment = value
     } else if (option === '--staging-attestation') options.stagingAttestation = value
     else throw new Error(`Unsupported production-promotion option: ${option}`)
@@ -98,21 +100,21 @@ function recordedSubmoduleCommit(root, rootCommit, path) {
 }
 
 /** Capture the coordinated commits represented by a root commit. */
-function coordinatedCommits(root, rootCommit, current) {
+function coordinatedCommits(root, rootCommit, fromWorkingTree) {
   return REPOSITORIES.map((name) => ({
     name,
     commit:
       name === 'openfray'
         ? rootCommit
-        : current
+        : fromWorkingTree
           ? git(resolve(root, name), ['rev-parse', 'HEAD'])
           : recordedSubmoduleCommit(root, rootCommit, name),
   }))
 }
 
 /** Read exact file bytes from the candidate workspace or rollback commit. */
-function configurationBytes(root, entry, rootCommit, commits, current) {
-  if (current) {
+function configurationBytes(root, entry, rootCommit, commits, fromWorkingTree) {
+  if (fromWorkingTree) {
     const path = resolve(root, entry.repository === 'openfray' ? '.' : entry.repository, entry.path)
     return existsSync(path) ? readFileSync(path) : null
   }
@@ -127,9 +129,9 @@ function configurationBytes(root, entry, rootCommit, commits, current) {
 }
 
 /** Fingerprint deployment configuration at one coordinated candidate. */
-function configurationEvidence(root, rootCommit, commits, current) {
+function configurationEvidence(root, rootCommit, commits, fromWorkingTree) {
   return CONFIGURATION_PATHS.map((entry) => {
-    const bytes = configurationBytes(root, entry, rootCommit, commits, current)
+    const bytes = configurationBytes(root, entry, rootCommit, commits, fromWorkingTree)
     return {
       repository: entry.repository,
       path: entry.path,
@@ -139,9 +141,9 @@ function configurationEvidence(root, rootCommit, commits, current) {
 }
 
 /** Return the newest migration version represented by one console commit. */
-function migrationHead(root, consoleCommit, current) {
+function migrationHead(root, consoleCommit, fromWorkingTree) {
   let paths
-  if (current) {
+  if (fromWorkingTree) {
     const directory = resolve(root, 'console/supabase/migrations')
     paths = existsSync(directory)
       ? readdirSync(directory).map((name) => `supabase/migrations/${name}`)
@@ -177,19 +179,17 @@ function changedPaths(root, before, after) {
 }
 
 /** Select release-critical boundaries from root and console changes. */
-function applicableBoundaries(
-  root,
-  rollbackRoot,
-  candidateRoot,
-  rollbackConsole,
-  candidateConsole,
-) {
+function applicableBoundaries(root, rollback, candidate) {
   const boundaries = new Set()
-  for (const path of changedPaths(root, rollbackRoot, candidateRoot)) {
+  for (const path of changedPaths(root, rollback.rootCommit, candidate.rootCommit)) {
     for (const rule of ROOT_CRITICAL_PATHS)
       if (rule.pattern.test(path)) boundaries.add(rule.boundary)
   }
-  for (const path of changedPaths(resolve(root, 'console'), rollbackConsole, candidateConsole)) {
+  for (const path of changedPaths(
+    resolve(root, 'console'),
+    rollback.consoleCommit,
+    candidate.consoleCommit,
+  )) {
     if (path.startsWith('supabase/migrations/')) {
       boundaries.add('migration')
       boundaries.add('row-level-security')
@@ -197,9 +197,7 @@ function applicableBoundaries(
     }
     for (const rule of CRITICAL_PATHS) if (rule.pattern.test(path)) boundaries.add(rule.boundary)
   }
-  return ['migration', 'authentication', 'row-level-security', 'sharing', 'backup'].filter(
-    (value) => boundaries.has(value),
-  )
+  return PROMOTION_BOUNDARIES.filter((value) => boundaries.has(value))
 }
 
 /** Return whether one commit is a strict ancestor of another. */
@@ -241,10 +239,9 @@ function freshTimestamp(value, now = Date.now()) {
 
 /** Validate staging evidence against the exact candidate and rollback projections. */
 function verifyStagingAttestation(value, expected) {
-  const checkNames = ['migration', 'authentication', 'row-level-security', 'sharing', 'backup']
   const checksMatch =
     value?.checks?.build === 'passed' &&
-    checkNames.every(
+    PROMOTION_BOUNDARIES.every(
       (name) =>
         value?.checks?.[name] ===
         (expected.boundaries.includes(name) ? 'passed' : 'not-applicable'),
@@ -257,7 +254,7 @@ function verifyStagingAttestation(value, expected) {
     value?.candidate?.migrationHead === expected.candidate.migrationHead &&
     sameEvidence(value?.candidate?.configuration, expected.candidate.configuration) &&
     checksMatch &&
-    SAFE_IDENTITY.test(value?.approvedBy ?? '') &&
+    SAFE_PROMOTION_IDENTITY.test(value?.approvedBy ?? '') &&
     freshTimestamp(value?.recordedAt) &&
     sameEvidence(value?.rollback?.repositories, expected.rollback.repositories) &&
     value?.rollback?.migrationHead === expected.rollback.migrationHead &&
@@ -316,10 +313,8 @@ export function verifyProductionPromotion(options = {}) {
     candidateRoot && rollbackRoot && candidateConsole && rollbackConsole
       ? applicableBoundaries(
           settings.root,
-          rollbackRoot,
-          candidateRoot,
-          rollbackConsole,
-          candidateConsole,
+          { rootCommit: rollbackRoot, consoleCommit: rollbackConsole },
+          { rootCommit: candidateRoot, consoleCommit: candidateConsole },
         )
       : []
   const candidate = {

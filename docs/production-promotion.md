@@ -4,21 +4,21 @@ Production deploys run through `.github/workflows/production-promotion.yml`. Con
 
 Set the Cloudflare Pages production branch to `production`. Do not push source commits to that branch. The protected workflow uploads the approved candidate to that deployment branch after its gate passes.
 
+Configure required maintainer reviewers on the `staging`, `staging-attestation`, and `production` GitHub environments. Prevent self-review when the repository plan supports it. The workflows read the actual reviewer from GitHub's workflow approval history.
+
 Configure these protected environment values:
 
-| Environment  | Value                                | Purpose                                                  |
-| ------------ | ------------------------------------ | -------------------------------------------------------- |
-| `staging`    | `CLOUDFLARE_ACCOUNT_ID` secret       | Owns the Pages project.                                  |
-| `staging`    | `CLOUDFLARE_API_TOKEN` secret        | Permits the staging upload.                              |
-| `staging`    | `CLOUDFLARE_PAGES_PROJECT` variable  | Selects the Pages project.                               |
-| `staging`    | `STAGING_APPROVER` variable          | Records the authorized reviewer.                         |
-| `staging`    | `STAGING_ENVIRONMENT_ID` variable    | Identifies the authorized staging target.                |
-| `production` | `CLOUDFLARE_ACCOUNT_ID` secret       | Owns the Pages project.                                  |
-| `production` | `CLOUDFLARE_API_TOKEN` secret        | Permits the production upload.                           |
-| `production` | `CLOUDFLARE_PAGES_PROJECT` variable  | Selects the Pages project.                               |
-| `production` | `PRODUCTION_APPROVER` variable       | Records the authorized reviewer.                         |
-| `production` | `PRODUCTION_ENVIRONMENT_ID` variable | Identifies the production target.                        |
-| `production` | `STAGING_ENVIRONMENT_ID` variable    | Names the staging identity that may authorize promotion. |
+| Environment           | Value                                | Purpose                                                  |
+| --------------------- | ------------------------------------ | -------------------------------------------------------- |
+| `staging`             | `CLOUDFLARE_ACCOUNT_ID` secret       | Owns the Pages project.                                  |
+| `staging`             | `CLOUDFLARE_API_TOKEN` secret        | Permits the staging upload.                              |
+| `staging`             | `CLOUDFLARE_PAGES_PROJECT` variable  | Selects the Pages project.                               |
+| `staging-attestation` | `STAGING_ENVIRONMENT_ID` variable    | Identifies the authorized staging target.                |
+| `production`          | `CLOUDFLARE_ACCOUNT_ID` secret       | Owns the Pages project.                                  |
+| `production`          | `CLOUDFLARE_API_TOKEN` secret        | Permits the production upload.                           |
+| `production`          | `CLOUDFLARE_PAGES_PROJECT` variable  | Selects the Pages project.                               |
+| `production`          | `PRODUCTION_ENVIRONMENT_ID` variable | Identifies the production target.                        |
+| `production`          | `STAGING_ENVIRONMENT_ID` variable    | Names the staging identity that may authorize promotion. |
 
 Use fixed identifiers containing letters, numbers, periods, underscores, or hyphens. Keep provider project references and credentials out of the identifiers.
 
@@ -30,9 +30,9 @@ Merge the reviewed candidate before promotion when the release process requires 
 
 ## Stage a critical candidate
 
-Run `staging-candidate.yml` with the candidate commit and the current production commit as its rollback target. The workflow runs the tests and build, then deploys the exact candidate to the protected staging environment.
+Run `staging-candidate.yml` with the candidate commit and the current production commit as its rollback target. The workflow runs the tests and build, then deploys the exact candidate to the protected staging environment. Its attestation job waits for a separate `staging-attestation` environment review after deployment.
 
-Select `passed` only for checks reviewed against that deployment. Select `not-applicable` for other boundaries. Migration changes require passing migration, Row-Level Security, backup health, and rollback results. Authentication and sharing changes require their matching result and the rollback result.
+Review the completed staging job before approving its attestation job. Select `passed` only for checks reviewed against that deployment. Select `not-applicable` for other boundaries. Migration changes require passing migration, Row-Level Security, backup health, and rollback results. Authentication and sharing changes require their matching result and the rollback result.
 
 The workflow rejects result selections that disagree with the changed paths. It uploads `staging-release-attestation.json` with these bindings:
 
