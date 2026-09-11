@@ -16,5 +16,15 @@
     "skipLibCheck": true,
     "types": ["@cloudflare/workers-types", "node"]
   },
-  "include": ["functions", "share-card", "tests", "scripts", "vitest.config.ts"]
+  "include": [
+    "functions",
+    "public-boundary",
+    "rate-limit-worker",
+    "report-boundary",
+    "security",
+    "share-card",
+    "tests",
+    "scripts",
+    "vitest.config.ts"
+  ]
 }

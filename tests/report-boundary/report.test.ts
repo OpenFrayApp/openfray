@@ -11,6 +11,7 @@ const env: ReportEnv = {
   TURNSTILE_SECRET_KEY: 'turnstile-secret',
   REPORT_FINGERPRINT_KEY: 'fingerprint-secret',
   REPORT_ALLOWED_HOSTS: 'openfray.app,staging.openfray.app',
+  PUBLIC_ROUTE_LIMITER: { allow: async () => true },
 }
 
 /** Build one valid report request from the public console. */
@@ -58,6 +59,9 @@ describe('anonymous report boundary', () => {
       'https://challenges.cloudflare.com/turnstile/v0/siteverify',
     )
     expect(fetcher.mock.calls[1]?.[0]).toBe('https://db.example/rest/v1/rpc/share')
+    const shareRead = fetcher.mock.calls[1]?.[1]
+    expect(new Headers(shareRead?.headers).get('apikey')).toBe('anon-key')
+    expect(new Headers(shareRead?.headers).get('authorization')).toBeNull()
     expect(fetcher.mock.calls[2]?.[0]).toBe('https://db.example/rest/v1/rpc/accept_share_report')
     const insertion = fetcher.mock.calls[2]?.[1]
     expect(new Headers(insertion?.headers).get('authorization')).toBe('Bearer ingress-token')
@@ -159,6 +163,20 @@ describe('anonymous report boundary', () => {
     const response = await handleReportRequest(request(), env, fetcher)
     expect(response.status).toBe(status)
     expect(fetcher).toHaveBeenCalledTimes(3)
+  })
+
+  it('returns timed out when an upstream exceeds the route deadline', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockImplementation((_input, init) => {
+      return new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true })
+      })
+    })
+
+    const response = await handleReportRequest(request(), env, fetcher, 1)
+
+    expect(response.status).toBe(504)
+    expect(response.headers.get('x-request-id')).toMatch(/^[0-9a-f-]{36}$/)
+    expect(fetcher).toHaveBeenCalledOnce()
   })
 
   it('fails unavailable without calling an upstream when secrets are missing', async () => {

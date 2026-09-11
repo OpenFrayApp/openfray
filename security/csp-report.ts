@@ -1,7 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Nicola Mustone
 
-const REPORT_BYTES = 4096
+import {
+  failureResponse,
+  FixedWindowRateLimiter,
+  identifyResponse,
+  publicRequestId,
+  PUBLIC_ROUTE_POLICIES,
+  readBoundedBody,
+  type PublicRateLimiter,
+  type PublicRouteDiagnostic,
+} from '../public-boundary/route.ts'
+
 const DIRECTIVES = new Set([
   'default-src',
   'script-src',
@@ -24,7 +34,7 @@ const DIRECTIVES = new Set([
 ])
 const DISPOSITIONS = new Set(['enforce', 'report'])
 
-type DiagnosticLogger = (diagnostic: CspDiagnostic) => void
+type DiagnosticLogger = (diagnostic: CspDiagnostic | PublicRouteDiagnostic) => void
 
 /** The fixed, privacy-safe projection retained from a browser CSP report. */
 export interface CspDiagnostic {
@@ -36,8 +46,11 @@ export interface CspDiagnostic {
 }
 
 /** Return a no-store response without reflecting report data. */
-function answer(status: number): Response {
-  return new Response(null, { status, headers: { 'cache-control': 'no-store' } })
+function answer(status: number, requestId: string): Response {
+  return identifyResponse(
+    new Response(null, { status, headers: { 'cache-control': 'no-store' } }),
+    requestId,
+  )
 }
 
 /** Reduce a blocked address to a fixed resource class without retaining its URL. */
@@ -51,43 +64,8 @@ function resourceClass(value: unknown): string {
     : 'other'
 }
 
-/** Read at most one bounded report body and cancel the stream at the ceiling. */
-async function readBoundedBody(request: Request): Promise<Uint8Array | 'large' | null> {
-  if (!request.body) return null
-  const reader = request.body.getReader()
-  const chunks: Uint8Array[] = []
-  let size = 0
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      size += value.byteLength
-      if (size > REPORT_BYTES) {
-        await reader.cancel()
-        return 'large'
-      }
-      chunks.push(value)
-    }
-  } catch {
-    return null
-  } finally {
-    reader.releaseLock()
-  }
-  const bytes = new Uint8Array(size)
-  let offset = 0
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset)
-    offset += chunk.byteLength
-  }
-  return bytes
-}
-
 /** Parse one browser report into the only fields permitted in diagnostics. */
-async function parseDiagnostic(request: Request): Promise<CspDiagnostic | 'large' | null> {
-  const declared = Number(request.headers.get('content-length') ?? 0)
-  if (Number.isFinite(declared) && declared > REPORT_BYTES) return 'large'
-  const bytes = await readBoundedBody(request)
-  if (bytes === 'large' || bytes === null) return bytes
+function parseDiagnostic(bytes: Uint8Array): CspDiagnostic | null {
   let value: unknown
   try {
     value = JSON.parse(new TextDecoder().decode(bytes))
@@ -125,14 +103,28 @@ async function parseDiagnostic(request: Request): Promise<CspDiagnostic | 'large
 export async function handleCspReportRequest(
   request: Request,
   log: DiagnosticLogger = console.log,
+  limiter: PublicRateLimiter = new FixedWindowRateLimiter(),
 ): Promise<Response> {
-  if (request.method !== 'POST') return answer(405)
+  const requestId = publicRequestId()
+  /** Return one classified CSP-report failure with privacy-safe diagnostics. */
+  const fail = (failure: 'invalid' | 'limited' | 'unavailable' | 'timed_out') =>
+    failureResponse(answer(200, requestId), 'csp-report', failure, requestId, log)
+  if (request.method !== 'POST') return answer(405, requestId)
   if (request.headers.get('content-type')?.split(';', 1)[0].trim() !== 'application/csp-report') {
-    return answer(415)
+    return answer(415, requestId)
   }
-  const diagnostic = await parseDiagnostic(request)
-  if (diagnostic === 'large') return answer(413)
-  if (!diagnostic) return answer(400)
+  const admission = await limiter.allow(request, PUBLIC_ROUTE_POLICIES['csp-report'])
+  if (admission !== true) return fail(admission === 'unavailable' ? 'unavailable' : 'limited')
+  const body = await readBoundedBody(
+    request,
+    PUBLIC_ROUTE_POLICIES['csp-report'].requestBytes,
+    AbortSignal.timeout(PUBLIC_ROUTE_POLICIES['csp-report'].timeoutMs),
+  )
+  if (body === 'large') return answer(413, requestId)
+  if (body === 'timed_out') return fail('timed_out')
+  if (!body) return fail('invalid')
+  const diagnostic = parseDiagnostic(body)
+  if (!diagnostic) return fail('invalid')
   log(diagnostic)
-  return answer(204)
+  return answer(204, requestId)
 }

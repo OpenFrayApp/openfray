@@ -1,6 +1,6 @@
 # Anonymous report boundary
 
-`functions/api/reports.ts` is the only public report insertion path. The console posts to `/api/reports`; it never calls the database operation directly.
+`functions/api/reports.ts` is the only public report insertion path. The console posts to `/api/reports`; it never calls the database operation directly. Configure its shared edge controls through [the public route boundary](./public-route-boundary.md).
 
 ## Configure an environment
 
