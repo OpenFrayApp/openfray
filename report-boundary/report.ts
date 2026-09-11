@@ -153,7 +153,6 @@ async function publishedShare(
       headers: {
         'content-type': 'application/json',
         apikey: db.key,
-        authorization: `Bearer ${db.key}`,
       },
       body: JSON.stringify({ want: input.code }),
     },

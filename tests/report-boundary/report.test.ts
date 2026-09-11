@@ -59,6 +59,9 @@ describe('anonymous report boundary', () => {
       'https://challenges.cloudflare.com/turnstile/v0/siteverify',
     )
     expect(fetcher.mock.calls[1]?.[0]).toBe('https://db.example/rest/v1/rpc/share')
+    const shareRead = fetcher.mock.calls[1]?.[1]
+    expect(new Headers(shareRead?.headers).get('apikey')).toBe('anon-key')
+    expect(new Headers(shareRead?.headers).get('authorization')).toBeNull()
     expect(fetcher.mock.calls[2]?.[0]).toBe('https://db.example/rest/v1/rpc/accept_share_report')
     const insertion = fetcher.mock.calls[2]?.[1]
     expect(new Headers(insertion?.headers).get('authorization')).toBe('Bearer ingress-token')

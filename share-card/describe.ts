@@ -47,7 +47,6 @@ async function readShare(env: CardEnv, code: string, deadline: number): Promise<
       headers: {
         'content-type': 'application/json',
         apikey: supabase.key,
-        authorization: `Bearer ${supabase.key}`,
       },
       body: JSON.stringify({ want: code }),
     },

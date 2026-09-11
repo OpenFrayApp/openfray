@@ -72,6 +72,9 @@ afterEach(() => vi.unstubAllGlobals())
 describe('describeShare', () => {
   it('names an encounter, counts its cast, and resolves an id against the sidecar', async () => {
     const card = await describeShare(envWith(encounter), CODE, ORIGIN)
+    const shareRead = vi.mocked(fetch).mock.calls[0]?.[1]
+    expect(new Headers(shareRead?.headers).get('apikey')).toBe('anon')
+    expect(new Headers(shareRead?.headers).get('authorization')).toBeNull()
     expect(card).toEqual({
       kind: 'encounter',
       name: 'Ambush at the ford',
