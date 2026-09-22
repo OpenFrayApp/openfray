@@ -13,8 +13,6 @@ const branch = git('branch', '--show-current')
 if (!branch || branch === 'main') {
   throw new Error('Prepare a release candidate branch before running npm run release.')
 }
-const rollbackTarget = git('rev-parse', 'origin/main')
-
 run('git submodule update --remote')
 run('npm install')
 
@@ -34,8 +32,5 @@ execFileSync('git', ['commit', '-s', '-m', message], { stdio: 'inherit' })
 execFileSync('git', ['push', '--set-upstream', 'origin', branch], { stdio: 'inherit' })
 
 const candidateCommit = git('rev-parse', 'HEAD')
-console.log('\nRelease candidate prepared. Stage it with:')
-console.log(
-  `gh workflow run staging-candidate.yml -f candidate_commit=${candidateCommit} -f rollback_target=${rollbackTarget}`,
-)
-console.log('After staging review, promote its workflow run through production-promotion.yml.')
+console.log(`\nRelease update pushed at ${candidateCommit}.`)
+console.log('Open a pull request into develop. Cloudflare deploys it to staging after merge.')
