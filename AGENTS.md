@@ -73,8 +73,8 @@ This parent repo owns the deploy and the shared docs.
 Day to day, each part is worked on as its own standalone clone (the site needs a
 `console` clone beside it). Clone this repo with `git clone --recurse-submodules` to
 build or release the whole. A change to a part is committed in that part's repo;
-this repo then records the new submodule pointer, and that pointer-bump commit is
-what becomes a release candidate. The protected staging and production workflows deploy it.
+this repo then records the new submodule pointer. A merge into `develop` deploys
+staging, and a merge into `main` deploys production.
 
 Each part documents itself: the console's AGENTS.md holds the scope principle in
 full, the architectural rules, and the build order; the site's holds the book
@@ -232,9 +232,9 @@ the same commit.
   `Copy`, `Tests`. The body explains _why_, in prose.
 - **Sign-off (DCO):** every commit carries `Signed-off-by` — use `git commit -s`.
   There is no CLA.
-- **Don't promote without the maintainer's go-ahead.** The protected production
-  workflow deploys the reviewed candidate to Cloudflare Pages. A part repo's push
-  changes nothing in production until a coordinated candidate is promoted.
+- **Merge releases through `develop`.** Cloudflare deploys `develop` to staging and
+  `main` to production. A part repo's push changes nothing until this repo records
+  its submodule commit.
 
 ## Working agreements
 
