@@ -4,6 +4,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { deploymentHeaders } from '../../scripts/deployment-headers.mjs'
 
 const HEADER = readFileSync(resolve(__dirname, '../../cloudflare/_headers'), 'utf8')
 const POLICY = HEADER.match(/^  Content-Security-Policy: (.+)$/m)?.[1] ?? ''
@@ -28,6 +29,26 @@ function allows(directive: string, resource: string): boolean {
   if (url.origin === 'https://openfray.app' && sources.includes("'self'")) return true
   return sources.includes(url.origin)
 }
+
+describe('environment-specific Content Security Policy', () => {
+  it('allows only the selected staging project without widening production', () => {
+    const staging = deploymentHeaders(HEADER, 'https://abcdefghijklmnopqrst.supabase.co')
+    expect(staging).toContain('https://abcdefghijklmnopqrst.supabase.co')
+    expect(staging).toContain('wss://abcdefghijklmnopqrst.supabase.co')
+    expect(staging).not.toContain('jhfjzzciubewzujafadj.supabase.co')
+    expect(staging).toContain('frame-src https://challenges.cloudflare.com')
+    expect(deploymentHeaders(HEADER, 'https://jhfjzzciubewzujafadj.supabase.co/')).toBe(HEADER)
+    expect(deploymentHeaders(HEADER, undefined)).toBe(HEADER)
+  })
+
+  it.each([
+    'https://evil.example',
+    'http://abcdefghijklmnopqrst.supabase.co',
+    'https://abcdefghijklmnopqrst.supabase.co; connect-src *',
+  ])('rejects an invalid hosted project origin: %s', (url) => {
+    expect(() => deploymentHeaders(HEADER, url)).toThrow('hosted Supabase HTTPS origin')
+  })
+})
 
 describe('enforced Content Security Policy', () => {
   it('supports required console, player, share, authentication, and asset paths', () => {

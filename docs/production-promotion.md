@@ -20,6 +20,11 @@ Configure these protected environment values:
 | `production`          | `PRODUCTION_ENVIRONMENT_ID` variable | Identifies the production target.                        |
 | `production`          | `STAGING_ENVIRONMENT_ID` variable    | Names the staging identity that may authorize promotion. |
 
+Set `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_TURNSTILE_SITE_KEY` as variables in both the `staging` and `production` GitHub environments.
+Use each environment’s public project URL, anon or publishable key, and Turnstile site key. Never put a service-role key or Turnstile secret in these variables.
+GitHub builds do not inherit Cloudflare Pages build settings. The workflows reject missing settings before building.
+Configure the server-side report secrets and hostname allowlist separately in Pages, following [the report boundary guide](./report-boundary.md).
+
 Use fixed identifiers containing letters, numbers, periods, underscores, or hyphens. Keep provider project references and credentials out of the identifiers.
 
 ## Prepare a candidate

@@ -69,7 +69,11 @@ beforeEach(() => {
     'console/dist/console/compendium/srd-spells.json',
     JSON.stringify([{ id: 'srd-5.2:fireball' }]),
   )
-  execFileSync('node', [SCRIPT], { cwd: dir, stdio: 'pipe' })
+  execFileSync('node', [SCRIPT], {
+    cwd: dir,
+    stdio: 'pipe',
+    env: { ...process.env, VITE_SUPABASE_URL: '' },
+  })
 })
 
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
@@ -134,6 +138,18 @@ describe('assemble-site', () => {
 
   it('removes /lab, the section-component demo, assets included', () => {
     expect(existsSync(join(dir, 'dist/lab'))).toBe(false)
+  })
+
+  it('binds assembled staging headers to the staging build project', () => {
+    execFileSync('node', [SCRIPT], {
+      cwd: dir,
+      stdio: 'pipe',
+      env: { ...process.env, VITE_SUPABASE_URL: 'https://abcdefghijklmnopqrst.supabase.co' },
+    })
+    const headers = readFileSync(join(dir, 'dist/_headers'), 'utf8')
+    expect(headers).toContain('https://abcdefghijklmnopqrst.supabase.co')
+    expect(headers).toContain('wss://abcdefghijklmnopqrst.supabase.co')
+    expect(headers).not.toContain('jhfjzzciubewzujafadj.supabase.co')
   })
 
   it('ships the deployment-owned enforced security headers', () => {
