@@ -2,6 +2,9 @@
 
 `cloudflare/_headers` owns the response policy for the assembled deployment. The assembly script overwrites any header file copied from a submodule. This keeps one policy across the website, console, handbook, player view, and published shares.
 
+Assembly binds the policy’s HTTPS and WebSocket Supabase connections to `VITE_SUPABASE_URL`, matching the console build.
+A staging build permits its staging project only. The default production policy remains unchanged when that variable names production or is unset.
+
 The policy permits the same-origin build assets, Supabase connections, Fathom analytics, Cloudflare Web Analytics, and the Turnstile report challenge. All other script, style, connection, frame, image, font, media, worker, and object sources are blocked by default.
 
 ## Diagnostics

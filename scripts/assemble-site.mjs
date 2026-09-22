@@ -24,13 +24,17 @@ import {
   PUBLICATION_SOURCE_MANIFEST,
 } from '../console/src/publication/index.ts'
 import { createPublicationDeploymentManifest } from './publication-deployment-manifest.mjs'
+import { deploymentHeaders } from './deployment-headers.mjs'
 
 // Site root (/) → the Astro-built marketing site (home, privacy, terms, 404).
 cpSync('site/dist', 'dist', { recursive: true })
 
 // Response policy belongs to the assembled deployment because it governs all three
 // surfaces. Overwrite the site's build copy so a stale submodule header cannot ship.
-copyFileSync('cloudflare/_headers', 'dist/_headers')
+writeFileSync(
+  'dist/_headers',
+  deploymentHeaders(readFileSync('cloudflare/_headers', 'utf8'), process.env.VITE_SUPABASE_URL),
+)
 
 // /console → the Vite-built app. The console workspace builds into its own
 // dist/console so the base path survives; copy it under the same path here.
