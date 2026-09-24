@@ -29,6 +29,7 @@ dist-ssr/
 build/
 out/
 .vite/
+.artifacts/
 
 # ───────────────────────────────────────────────────────────────
 # Test / coverage

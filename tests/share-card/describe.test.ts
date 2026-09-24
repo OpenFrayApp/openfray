@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Nicola Mustone
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { describeShare, type CardEnv } from '../../share-card/describe.ts'
+import { describeShareResult, type CardEnv } from '../../share-card/describe.ts'
 
 const CODE = 'k7mqx3rt9p'
 const ORIGIN = 'https://openfray.app/s/k7mqx3rt9p'
@@ -43,6 +43,12 @@ function envWith(row: unknown, overrides: Partial<CardEnv> = {}): CardEnv {
   }
 }
 
+/** Return the card from a successful description or null for a bounded fallback. */
+async function describeShare(env: CardEnv, code: string, origin: string) {
+  const result = await describeShareResult(env, code, origin)
+  return result.status === 'ok' ? result.card : null
+}
+
 const encounter = {
   kind: 'encounter',
   data: {
@@ -66,6 +72,9 @@ afterEach(() => vi.unstubAllGlobals())
 describe('describeShare', () => {
   it('names an encounter, counts its cast, and resolves an id against the sidecar', async () => {
     const card = await describeShare(envWith(encounter), CODE, ORIGIN)
+    const shareRead = vi.mocked(fetch).mock.calls[0]?.[1]
+    expect(new Headers(shareRead?.headers).get('apikey')).toBe('anon')
+    expect(new Headers(shareRead?.headers).get('authorization')).toBeNull()
     expect(card).toEqual({
       kind: 'encounter',
       name: 'Ambush at the ford',
@@ -162,7 +171,7 @@ describe('describeShare', () => {
     })
   })
 
-  it('falls back to the id for a creature no shipped library answers for', async () => {
+  it('uses the generic fallback for a source this deployment does not support', async () => {
     const share = {
       kind: 'encounter',
       data: {
@@ -171,9 +180,27 @@ describe('describeShare', () => {
         entries: [{ ref: 'some-future-book:bone-piper', count: 2, side: 'foe' }],
       },
     }
-    const card = await describeShare(envWith(share), CODE, ORIGIN)
-    expect(card && 'chips' in card && card.chips[0].name).toBe('Bone Piper')
+    expect(await describeShare(envWith(share), CODE, ORIGIN)).toBeNull()
     expect(assetPaths).toEqual([])
+  })
+
+  it('uses the generic fallback when a declared compendium entry is missing', async () => {
+    const share = {
+      kind: 'encounter',
+      data: {
+        v: 1,
+        name: 'Missing creature',
+        entries: [{ ref: 'srd-5.2:missing', count: 1, side: 'foe' }],
+      },
+    }
+    const env = envWith(share, {
+      ASSETS: {
+        async fetch() {
+          return new Response('{}')
+        },
+      },
+    })
+    expect(await describeShare(env, CODE, ORIGIN)).toBeNull()
   })
 
   describe('every failure degrades to the generic shell', () => {
@@ -183,6 +210,21 @@ describe('describeShare', () => {
       ['a code behind no row', null, CODE, {}],
       ['a kind this version has never heard of', { kind: 'campaign', data: {} }, CODE, {}],
       ['a payload that will not parse', { kind: 'encounter', data: { v: 1 } }, CODE, {}],
+      [
+        'a payload from a future schema',
+        { kind: 'encounter', data: { ...encounter.data, v: 2 } },
+        CODE,
+        {},
+      ],
+      [
+        'a hostile payload',
+        {
+          kind: 'encounter',
+          data: JSON.parse('{"v":1,"name":"Hostile","entries":[],"__proto__":{"polluted":true}}'),
+        },
+        CODE,
+        {},
+      ],
       [
         'an environment nobody set the variables in',
         encounter,
@@ -217,6 +259,33 @@ describe('describeShare', () => {
         vi.fn(async () => new Response('nope', { status: 500 })),
       )
       expect(await describeShare(env, CODE, ORIGIN)).toBeNull()
+    })
+
+    it('classifies a stalled database lookup at the route deadline', async () => {
+      const env = envWith(encounter)
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          (_input, init) =>
+            new Promise((_resolve, reject) => {
+              init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), {
+                once: true,
+              })
+            }),
+        ),
+      )
+
+      expect(await describeShareResult(env, CODE, ORIGIN, 1)).toEqual({ status: 'timed_out' })
+    })
+
+    it('rejects an upstream share payload beyond its response ceiling', async () => {
+      const env = envWith(encounter)
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => new Response(`\"${'x'.repeat(70_000)}\"`)),
+      )
+
+      expect(await describeShareResult(env, CODE, ORIGIN)).toEqual({ status: 'unavailable' })
     })
   })
 })

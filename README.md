@@ -87,9 +87,10 @@ npm run build
 ```
 
 `npm run build` builds all three parts and assembles `dist/`; `npm run test` chains
-every suite. Releasing is `npm run release` (optionally
-`npm run release -- "Build: release 1.1.0"`): it pulls each part's latest `main`,
-syncs the lockfile, rebuilds everything, and commits + pushes the pointer bump.
+every suite. `npm run release` prepares and pushes a coordinated update from a
+release branch. Merge it into `develop` for staging, then merge `develop` into `main`
+for production. See [Deployment](./docs/deployment.md) for the branch and database
+workflow.
 
 How the repo is organized, the architectural rules, and the code style live in
 [`AGENTS.md`](./AGENTS.md); the writing style for every published word lives in

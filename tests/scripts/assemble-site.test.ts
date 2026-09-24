@@ -2,12 +2,15 @@
 // Copyright (C) 2026 Nicola Mustone
 
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { PUBLICATION_SOURCE_MANIFEST } from '../../console/src/publication/index.ts'
 
 const SCRIPT = resolve(__dirname, '../../scripts/assemble-site.mjs')
+const DEPLOYMENT_HEADERS = readFileSync(resolve(__dirname, '../../cloudflare/_headers'), 'utf8')
 let dir: string
 
 /** Drop a file into the fixture, creating parent folders. */
@@ -32,6 +35,8 @@ beforeEach(() => {
   file('site/dist/lab/index.html', '<html>lab</html>')
   file('site/dist/lab/loop.mp4', 'mp4')
   file('site/dist/sitemap-index.xml', '<sitemapindex>site-only</sitemapindex>')
+  file('site/dist/_headers', 'stale site-owned headers')
+  file('cloudflare/_headers', DEPLOYMENT_HEADERS)
   file('handbook/dist/index.html', '<html>docs</html>')
   file('brand/fonts/inter-500.ttf', 'ttf')
   file('brand/fonts/LICENSE.txt', 'the SIL Open Font License')
@@ -51,15 +56,24 @@ beforeEach(() => {
       '</head><body>app</body></html>',
     ].join(''),
   )
-  file(
-    'console/dist/console/compendium/srd-creatures.json',
-    JSON.stringify([{ id: 'srd-5.2:goblin', name: 'Goblin', size: 'Small', type: 'humanoid' }]),
-  )
+  for (const source of PUBLICATION_SOURCE_MANIFEST.sources) {
+    const fileName = source.indexPath.replace(/\.index\.json$/, '.json')
+    const id = source.id === 'srd-5.2' ? 'srd-5.2:goblin' : `${source.id}:fixture`
+    const name = source.id === 'srd-5.2' ? 'Goblin' : 'Fixture creature'
+    file(
+      `console/dist/console/compendium/${fileName}`,
+      JSON.stringify([{ id, name, size: 'Small', type: 'humanoid' }]),
+    )
+  }
   file(
     'console/dist/console/compendium/srd-spells.json',
     JSON.stringify([{ id: 'srd-5.2:fireball' }]),
   )
-  execFileSync('node', [SCRIPT], { cwd: dir, stdio: 'pipe' })
+  execFileSync('node', [SCRIPT], {
+    cwd: dir,
+    stdio: 'pipe',
+    env: { ...process.env, VITE_SUPABASE_URL: '' },
+  })
 })
 
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
@@ -95,6 +109,26 @@ describe('assemble-site', () => {
     expect(existsSync(join(dir, 'dist/console/compendium/srd-spells.index.json'))).toBe(false)
   })
 
+  it('writes independently versioned publication evidence with an exact manifest hash', () => {
+    const manifestBytes = readFileSync(
+      join(dir, 'dist/publication-deployment-manifest.json'),
+      'utf8',
+    )
+    const manifest = JSON.parse(manifestBytes)
+    expect(manifest).toMatchObject({
+      deploymentManifestVersion: 1,
+      publicationInterfaceVersion: 1,
+      publishedShareSchemaVersion: 1,
+      sourceManifestVersion: 1,
+    })
+    expect(manifest.artifacts.sourceIndexes).toHaveLength(
+      PUBLICATION_SOURCE_MANIFEST.sources.length,
+    )
+    expect(
+      readFileSync(join(dir, 'dist/publication-deployment-manifest.sha256'), 'utf8').trim(),
+    ).toBe(createHash('sha256').update(manifestBytes).digest('hex'))
+  })
+
   // Satori draws the share cards and needs real font files. They are served as assets, and
   // the licence travels with them because the SIL Open Font License asks that it does.
   it('serves the card typeface, licence included', () => {
@@ -104,6 +138,31 @@ describe('assemble-site', () => {
 
   it('removes /lab, the section-component demo, assets included', () => {
     expect(existsSync(join(dir, 'dist/lab'))).toBe(false)
+  })
+
+  it('binds assembled staging headers to the staging build project', () => {
+    execFileSync('node', [SCRIPT], {
+      cwd: dir,
+      stdio: 'pipe',
+      env: { ...process.env, VITE_SUPABASE_URL: 'https://abcdefghijklmnopqrst.supabase.co' },
+    })
+    const headers = readFileSync(join(dir, 'dist/_headers'), 'utf8')
+    expect(headers).toContain('https://abcdefghijklmnopqrst.supabase.co')
+    expect(headers).toContain('wss://abcdefghijklmnopqrst.supabase.co')
+    expect(headers).not.toContain('jhfjzzciubewzujafadj.supabase.co')
+  })
+
+  it('ships the deployment-owned enforced security headers', () => {
+    const headers = readFileSync(join(dir, 'dist/_headers'), 'utf8')
+    expect(headers).toBe(DEPLOYMENT_HEADERS)
+    expect(headers).toContain('Content-Security-Policy:')
+    expect(headers).toContain("script-src 'self' 'unsafe-inline'")
+    expect(headers).toContain("style-src 'self' 'unsafe-inline'")
+    expect(headers).toContain("connect-src 'self'")
+    expect(headers).toContain('frame-src https://challenges.cloudflare.com')
+    expect(headers).toContain("object-src 'none'")
+    expect(headers).toContain('report-uri /api/csp-reports')
+    expect(headers).not.toContain('Content-Security-Policy-Report-Only')
   })
 
   it('writes the Pages redirects: slash normalisation, code rewrites, moved docs URLs', () => {

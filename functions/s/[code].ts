@@ -1,7 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Nicola Mustone
 
-import { describeShare, type CardEnv } from '../../share-card/describe.ts'
+import { isPublicationShareCode } from '../../console/src/publication/index.ts'
+import {
+  canonicalRouteRequest,
+  failureResponse,
+  boundedResponse,
+  identifyResponse,
+  publicRequestId,
+  routeRateLimiter,
+  PUBLIC_ROUTE_POLICIES,
+  remainingTime,
+  workersCache,
+} from '../../public-boundary/route.ts'
+import { describeShareResult, type CardEnv } from '../../share-card/describe.ts'
 import { cardDescription, cardImageAlt, type ShareCard } from '../../share-card/card.ts'
 
 /**
@@ -17,8 +29,7 @@ import { cardDescription, cardImageAlt, type ShareCard } from '../../share-card/
  * already there. Templating a fresh document here is how the shell and the Function come to
  * drift.
  *
- * Every failure degrades to exactly the old behaviour — the generic card, HTTP 200 — never
- * to a 404 or a 500. See `describeShare`.
+ * Every failure uses the generic shell with a classified status and an opaque request ID.
  */
 
 /** Short on purpose: an unpublished or taken-down share stops unfurling within minutes. */
@@ -73,9 +84,55 @@ function decorate(response: Response, card: ShareCard, code: string, origin: str
   })
 }
 
+/** Read the static share shell under the route's remaining time and size ceilings. */
+async function readShell(
+  next: () => Promise<Response>,
+  timeoutMs: number,
+): Promise<Response | null> {
+  const result = await boundedResponse(
+    async () => next(),
+    'https://asset.internal',
+    {},
+    {
+      timeoutMs,
+      responseBytes: PUBLIC_ROUTE_POLICIES.share.responseBytes,
+    },
+  )
+  return result.status === 'ok'
+    ? new Response(result.body, {
+        status: result.response.status,
+        headers: result.response.headers,
+      })
+    : null
+}
+
+/** Decorate one bounded public share shell or return its classified generic fallback. */
 export const onRequestGet: PagesFunction<CardEnv> = async ({ params, env, request, next }) => {
+  const requestId = publicRequestId()
   const code = String(params.code ?? '').toLowerCase()
-  const card = await describeShare(env, code, request.url)
-  if (!card) return next()
-  return decorate(await next(), card, code, request.url)
+  const fallback = async (
+    failure: 'invalid' | 'limited' | 'missing' | 'unavailable' | 'timed_out',
+  ) =>
+    failureResponse(
+      (await readShell(next, 500)) ?? new Response('<!doctype html><title>OpenFray</title>'),
+      'share',
+      failure,
+      requestId,
+    )
+  if (request.url.length > 2_048 || !isPublicationShareCode(code)) return fallback('invalid')
+  const limiter = routeRateLimiter(env)
+  const admission = await limiter.allow(request, PUBLIC_ROUTE_POLICIES.share)
+  if (admission !== true) return fallback(admission === 'unavailable' ? 'unavailable' : 'limited')
+  const cache = workersCache()
+  const cacheKey = canonicalRouteRequest(request, `/s/${code}`)
+  const hit = await cache?.match(cacheKey)
+  if (hit) return identifyResponse(hit, requestId)
+  const deadline = Date.now() + PUBLIC_ROUTE_POLICIES.share.timeoutMs
+  const result = await describeShareResult(env, code, request.url, remainingTime(deadline))
+  if (result.status !== 'ok') return fallback(result.status)
+  const shell = await readShell(next, remainingTime(deadline))
+  if (!shell) return fallback(Date.now() >= deadline ? 'timed_out' : 'unavailable')
+  const response = decorate(shell, result.card, code, request.url)
+  await cache?.put(cacheKey, response.clone())
+  return identifyResponse(response, requestId)
 }

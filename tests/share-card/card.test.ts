@@ -13,7 +13,6 @@ import {
   type CreatureCard,
   type EncounterCard,
 } from '../../share-card/card.ts'
-import { BYLINE_MAX } from '../../console/src/lib/byline.ts'
 
 const ambush: EncounterCard = {
   kind: 'encounter',
@@ -69,7 +68,7 @@ describe('the shared card', () => {
     expect(clipByline('  Nicola Mustone  ')).toBe('Nicola Mustone')
     expect(clipByline('')).toBeUndefined()
     const long = clipByline('a'.repeat(60))
-    expect(long).toHaveLength(BYLINE_MAX)
+    expect(long).toHaveLength(30)
     expect(long?.endsWith('…')).toBe(true)
   })
 
