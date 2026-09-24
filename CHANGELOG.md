@@ -16,8 +16,6 @@ Versions through 1.2.0 record the console’s release history.
 ### Changed
 
 - Sign in with Google or Discord directly, with the Terms notice beside the provider buttons and no checkbox.
-- The Terms, Privacy Policy, and handbook describe the same sign-in flow and age requirements.
-- Save status appears as a compact dot with its message and recovery actions available on hover, focus, or tap.
 - The tracker uses updated cleanup icons, and the game log heading separates it from the controls.
 - Keyboard focus is visible, initiative rows support arrow-key reordering, and repeated touch controls have larger targets. ([console#42](https://github.com/OpenFrayApp/console/issues/42))
 
