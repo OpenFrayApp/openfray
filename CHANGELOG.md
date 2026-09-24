@@ -3,12 +3,13 @@
 Release notes for the console, website, and handbook live here, newest first.
 Versions through 1.2.0 record the console’s release history.
 
-## 1.3.0 (unreleased)
+## 1.3.0 (2026-09-24)
 
 ### Added
 
 - Offline recovery and security hardening, including safe updates, cloud-copy conflict handling, session recovery, and reliable shared player views. ([console#38](https://github.com/OpenFrayApp/console/issues/38))
 - Search creatures, spells, conditions, saved characters, and console navigation from the header, with scrollable results and a configurable keyboard shortcut. ([console#41](https://github.com/OpenFrayApp/console/issues/41))
+  Search uses an icon-only button on phones and tablets.
 - Choose numeric, Roman numeral, or letter labels for repeated creatures; labels stay stable after removals. ([console#75](https://github.com/OpenFrayApp/console/issues/75))
 - Choose creature and ally marker colors, with independent reset arrows beside each picker. ([console#77](https://github.com/OpenFrayApp/console/issues/77))
 - Player-view marker colors follow the GM’s tracker by default, with separate overrides controlled by the GM. ([console#77](https://github.com/OpenFrayApp/console/issues/77))
