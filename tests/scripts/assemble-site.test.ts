@@ -165,6 +165,28 @@ describe('assemble-site', () => {
     expect(headers).not.toContain('Content-Security-Policy-Report-Only')
   })
 
+  it('keeps the offline HTML byte-stable without changing other routes or asset caching', () => {
+    const headers = readFileSync(join(dir, 'dist/_headers'), 'utf8')
+    const rules = headers.split(/\n(?=\/)/)
+    const protectedRoutes = [
+      '/console/',
+      '/console/index.html',
+      '/console/recover',
+      '/console/recover.html',
+    ]
+    for (const route of protectedRoutes) {
+      expect(rules.find((rule) => rule.startsWith(`${route}\n`))).toContain(
+        'Cache-Control: public, max-age=0, must-revalidate, no-transform',
+      )
+    }
+    expect(rules.filter((rule) => rule.includes('no-transform'))).toHaveLength(
+      protectedRoutes.length,
+    )
+    expect(rules.find((rule) => rule.startsWith('/console/assets/*\n'))).toContain(
+      'Cache-Control: public, max-age=31536000, immutable',
+    )
+  })
+
   it('writes the Pages redirects: slash normalisation, code rewrites, moved docs URLs', () => {
     const redirects = readFileSync(join(dir, 'dist/_redirects'), 'utf8')
     expect(redirects).toContain('/console            /console/             301')
