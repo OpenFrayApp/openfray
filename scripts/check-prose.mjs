@@ -12,11 +12,7 @@
 import { globSync, readFileSync } from 'node:fs'
 
 // The books are game text in an author's voice, and STYLE.md governs them separately.
-const DOCS = [
-  '*.md',
-  '*.md',
-  '.claude/skills/**/*.md',
-]
+const DOCS = ['*.md', '*.md', '.claude/skills/**/*.md']
 
 // Quoted legal text. CREDITS.md carries license wording that has to match its source, and
 // the code of conduct is the Contributor Covenant verbatim. Neither is ours to reword.
@@ -60,7 +56,13 @@ for (const pattern of DOCS) {
   for (const file of globSync(pattern, { exclude: (p) => p.includes('node_modules') }).sort()) {
     if (LEGAL.has(file)) continue
     files++
-    const body = prose(readFileSync(file, 'utf8'))
+    const source = readFileSync(file, 'utf8')
+    // Published release notes are an immutable record; lint the unreleased section only.
+    const current =
+      file === 'CHANGELOG.md'
+        ? source.split(/^## \d+\.\d+\.\d+ \(\d{4}-\d{2}-\d{2}\)\s*$/m)[0]
+        : source
+    const body = prose(current)
 
     body.split('\n').forEach((line, index) => {
       const dashes = (line.match(ASIDE)?.length ?? 0) + (WRAPPED.test(line) ? 1 : 0)

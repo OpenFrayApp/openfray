@@ -174,8 +174,8 @@ what a name can't.
 
 Every Markdown file in every OpenFray repo is technical documentation written for a
 developer or a user who needs to get something done. That includes each repo's
-`AGENTS.md` and `README.md`, `CONTRIBUTING.md` and `STYLE.md` here, the console
-repo's `CHANGELOG.md`, the handbook in the handbook repo, the news posts in the site
+`AGENTS.md` and `README.md`, `CONTRIBUTING.md`, `STYLE.md`, and `CHANGELOG.md` here,
+the handbook in the handbook repo, the news posts in the site
 repo, and the skill files in the site repo's `.claude/skills/`. Write all of it
 plain, short, and direct. Every repo carries the same `scripts/check-prose.mjs`,
 scoped to its own files. Nothing in these repos is an essay.
@@ -202,6 +202,16 @@ on every build and fails on the first.
 
 Run `node scripts/check-prose.mjs` before committing a doc change. It also reports the
 softer patterns without failing, so the count stays visible.
+
+## Release notes
+
+Keep one product changelog in this repo’s `CHANGELOG.md` for the console, site, and
+handbook. Component repos link to it. Add pending changes to the unreleased section;
+keep published entries unchanged. The prose check covers the unreleased section.
+
+Describe user-facing changes, grouped by feature. Keep a new feature and its
+implementation fixes in one entry. Routine documentation, screenshot, and video
+refreshes need no entry.
 
 ## Tests
 
