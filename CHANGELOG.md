@@ -11,7 +11,7 @@ Versions through 1.2.0 record the console’s release history.
 
 ### Fixed
 
-- Shared player views receive updates when the GM’s and players’ device clocks differ. ([console#83](https://github.com/OpenFrayApp/console/issues/83))
+- Shared player views receive updates and show the correct Real timer when the GM’s and players’ device clocks differ. ([console#83](https://github.com/OpenFrayApp/console/issues/83), [console#87](https://github.com/OpenFrayApp/console/issues/87))
 - Dead creatures appear below the living turn order in the player view, matching the GM’s tracker. ([console#85](https://github.com/OpenFrayApp/console/issues/85))
 
 ## 1.3.0 (2026-09-24)
