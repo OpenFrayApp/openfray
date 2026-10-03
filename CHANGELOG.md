@@ -5,6 +5,8 @@ Versions through 1.2.0 record the console’s release history.
 
 ## Unreleased
 
+## 1.3.1 (2026-10-03)
+
 ### Changed
 
 - The console displays its version after the license in the footer and phone settings menu.
