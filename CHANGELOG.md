@@ -3,6 +3,16 @@
 Release notes for the console, website, and handbook live here, newest first.
 Versions through 1.2.0 record the console’s release history.
 
+## Unreleased
+
+### Changed
+
+- The console displays its version after the license in the footer and phone settings menu.
+
+### Fixed
+
+- Shared player views receive updates when the GM’s and players’ device clocks differ. ([console#83](https://github.com/OpenFrayApp/console/issues/83))
+
 ## 1.3.0 (2026-09-24)
 
 ### Added
