@@ -78,3 +78,13 @@ site/.ds-css/
 .design-sync/
 .ds-sync/
 ds-bundle/
+
+# Private workspace state and generated artifacts.
+.claude/
+/docs/marketing/
+/.agents/product-marketing.md
+/.agents/product-marketing-context.md
+/.agents/listening-sources.md
+/.agents/loops/
+/.agents/advisors/
+.shotlist/

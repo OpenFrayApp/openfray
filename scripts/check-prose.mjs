@@ -12,7 +12,7 @@
 import { globSync, readFileSync } from 'node:fs'
 
 // The books are game text in an author's voice, and STYLE.md governs them separately.
-const DOCS = ['*.md', '*.md', '.claude/skills/**/*.md']
+const DOCS = ['*.md', 'docs/development/**/*.md']
 
 // Quoted legal text. CREDITS.md carries license wording that has to match its source, and
 // the code of conduct is the Contributor Covenant verbatim. Neither is ours to reword.
