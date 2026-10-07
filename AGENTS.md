@@ -176,7 +176,7 @@ Every Markdown file in every OpenFray repo is technical documentation written fo
 developer or a user who needs to get something done. That includes each repo's
 `AGENTS.md` and `README.md`, `CONTRIBUTING.md`, `STYLE.md`, and `CHANGELOG.md` here,
 the handbook in the handbook repo, the news posts in the site
-repo, and the skill files in the site repo's `.claude/skills/`. Write all of it
+repo, and the developer procedures in the site repo's `docs/development/`. Write all of it
 plain, short, and direct. Every repo carries the same `scripts/check-prose.mjs`,
 scoped to its own files. Nothing in these repos is an essay.
 
@@ -248,6 +248,9 @@ the same commit.
 
 ## Working agreements
 
+- **Repository files:** follow [Repository file policy](./docs/development/repository-files.md).
+  Contributor knowledge stays public; private marketing context and local tool state stay ignored.
+
 - **Keep PRs/changes focused** — one concern at a time.
 - **Be especially careful and explicit around:** auth, the `owner_id`/RLS boundary,
   anything touching user data, and the dice randomness. A change here that "works"
@@ -271,6 +274,6 @@ shipping **only its declared Open Game Content** (no Product Identity: art, fict
 names, sidebars), reproducing the **full OGL text + verbatim Section 15 chain**, and
 designating our OGC. **Never ingest SRD-excluded WotC IP** (Beholder, Mind Flayer, …).
 All of this is satisfied via an in-app About/Credits screen + the console repo's
-`CREDITS.md`, which is the public record of compliance. Full ingest instructions:
-`local/docs/content-licensing.md` (maintainer-local). This content licensing is
+`CREDITS.md`, which is the public record of compliance. Ingest checklist:
+[Content licensing](./docs/development/content-licensing.md). This content licensing is
 separate from the project's AGPL (which governs the code).

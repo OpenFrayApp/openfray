@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Nicola Mustone
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
@@ -14,12 +14,26 @@ const script = fileURLToPath(new URL('../../scripts/check-prose.mjs', import.met
 function check(file: string, content: string) {
   const directory = mkdtempSync(join(tmpdir(), 'openfray-prose-'))
   try {
+    mkdirSync(dirname(join(directory, file)), { recursive: true })
     writeFileSync(join(directory, file), content)
     return spawnSync(process.execPath, [script], { cwd: directory, encoding: 'utf8' })
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
 }
+
+describe('developer documentation prose checks', () => {
+  it('checks public developer procedures', () => {
+    expect(check('docs/development/setup.md', '# Setup\n\nNew — wording.\n').status).toBe(1)
+  })
+
+  it.each(['docs/marketing/product-marketing.md', '.claude/skills/example/SKILL.md'])(
+    'excludes private tool and marketing files at %s',
+    (file) => {
+      expect(check(file, '# Private\n\nNew — wording.\n').status).toBe(0)
+    },
+  )
+})
 
 describe('changelog prose checks', () => {
   it('preserves dated release notes while checking the unreleased section', () => {
