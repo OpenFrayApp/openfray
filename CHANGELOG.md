@@ -5,6 +5,12 @@ Versions through 1.2.0 record the console’s release history.
 
 ## Unreleased
 
+### Added
+
+- An optional guided tutorial takes about five minutes and uses the console’s real controls to set up and run a practice fight. ([console#97](https://github.com/OpenFrayApp/console/issues/97))
+  Restart from **Settings** or search; exiting preserves your working board.
+  Anonymous users can sign in or continue without an account after clearing everyone and the game log.
+
 ## 1.3.1 (2026-10-03)
 
 ### Changed
