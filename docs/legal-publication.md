@@ -77,9 +77,11 @@ Choose `LEGAL_BASELINE=true` only for the first approved initialization, then `f
 
 1. Establish the explicit baseline and confirm it sends no historical mail.
 2. Publish a Terms-only date change and invoke the account worker. Confirm one test-inbox
-   email contains the Terms date and production Terms link, with no Privacy link.
+   email uses the reviewed subject and production Terms link, with no Privacy link.
+   Confirm the Terms date remains pinned in publication and eligibility state.
 3. Repeat for Privacy-only and simultaneous changed dates. Confirm the combined case sends
-   one email with both dates and both production links.
+   one email with both production links. Confirm both dates remain pinned in publication state.
+   The v3 bodies declare no date variables.
 4. Verify all links resolve to published production pages. Inspect HTML, derived plain text,
    subject, sender, Reply-To override, signature, and absence of unresolved variables.
 5. Repeat registration and delivery concurrently. Confirm one durable event per document/date
