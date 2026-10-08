@@ -1,0 +1,41 @@
+name: Register published legal dates
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      baseline:
+        description: Establish the first baseline without historical notices
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: legal-publication
+  cancel-in-progress: false
+
+jobs:
+  register:
+    if: github.ref == 'refs/heads/main' && vars.LEGAL_PUBLICATION_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: legal-notices-production
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Verify Pages publication and register dates
+        env:
+          LEGAL_PUBLICATION_MODE: production
+          LEGAL_PUBLICATION_APPROVED: production
+          LEGAL_BASELINE: ${{ inputs.baseline == true && 'true' || 'false' }}
+          LEGAL_EXPECTED_REVISION: ${{ github.sha }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_READ_TOKEN }}
+          LEGAL_PUBLICATION_FUNCTION_URL: ${{ vars.LEGAL_PUBLICATION_FUNCTION_URL }}
+          LEGAL_PUBLICATION_HOOK_KEY: ${{ secrets.LEGAL_PUBLICATION_HOOK_KEY }}
+        run: node scripts/legal-publication.mjs
