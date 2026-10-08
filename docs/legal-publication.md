@@ -9,9 +9,9 @@ This workspace owns the post-publication job. Builds and assembly send no mail.
 
 Keep `LEGAL_PUBLICATION_ENABLED` unset in GitHub and the registration function during preparation.
 Keep the production account-mail scheduler disabled. These changes authorize no production send.
-Complete issue #110’s staging verification before enabling this flow.
+Complete the coordinated staging gate in [console#114](https://github.com/OpenFrayApp/console/issues/114) before enabling this flow.
 
-1. Apply both console account-mail migrations to authorized staging. Deploy the admin’s
+1. Apply the complete console migration lineage to authorized staging. Deploy the admin’s
    `account-mail` and `legal-publication` functions with their documented secret checks.
 2. Publish and pin the reviewed Terms, Privacy, and combined templates in staging.
 3. Deploy the site metadata and legal copy to staging. Run the staging verification below.
@@ -60,7 +60,10 @@ Provider acceptance is distinct from delivery; arrival need not coincide with pu
 ## Staging verification
 
 Use a separate staging database, an isolated HTTPS staging origin, and one maintainer-confirmed
-inbox. Leave the production job disabled throughout this procedure.
+inbox. Resolve a Supabase `develop` branch to its own project reference before deployment;
+never target its production parent. Follow the console’s
+[coordinated email verification](https://github.com/OpenFrayApp/console/blob/main/docs/account-email-verification.md)
+for the deployment order, staging matrix, pause/rollback procedure, and production gate. Leave the production job disabled throughout this procedure.
 Configure the admin function with `ACCOUNT_MAIL_MODE=staging`, `LEGAL_STAGING_ORIGIN`,
 `LEGAL_PUBLICATION_ENABLED=true`, and a separate `LEGAL_PUBLICATION_HOOK_KEY`.
 Configure the worker’s confirmed test inbox, domain checks, and pinned template revisions.
