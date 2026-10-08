@@ -8,6 +8,7 @@ Versions through 1.2.0 record the console’s release history.
 ### Added
 
 - Sign in with Patreon alongside Google and Discord.
+- New accounts receive one welcome email with getting-started pointers and console and handbook links after mail delivery is activated. ([console#110](https://github.com/OpenFrayApp/console/issues/110))
 
 ## 1.3.1 (2026-10-03)
 
