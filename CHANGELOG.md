@@ -5,6 +5,10 @@ Versions through 1.2.0 record the console’s release history.
 
 ## Unreleased
 
+### Added
+
+- Sign in with Patreon alongside Google and Discord.
+
 ## 1.3.1 (2026-10-03)
 
 ### Changed
