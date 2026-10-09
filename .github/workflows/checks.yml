@@ -30,6 +30,6 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npx --no-install playwright install --with-deps chromium
+      - run: npm run build
       - run: npm test
       - run: npm test --workspace handbook
-      - run: npm run build
