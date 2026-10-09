@@ -23,12 +23,39 @@ public-route fingerprint key.
 
 ## Release application changes
 
-1. Merge component changes into their repository's `main` branch.
-2. Run `npm run release` from a short-lived branch in this repository.
-3. Open its pull request against `develop`.
-4. Merge the pull request and verify the `develop` Preview deployment.
-5. Open a pull request from `develop` to `main`.
-6. Merge it to deploy production.
+1. List the expected companion PRs and merged commit SHAs before assembling the release.
+   Include console, site, and handbook; use the current integration commit for an unchanged part.
+   Record this list in the release PR so omitted work can be identified during review.
+2. Merge console changes into `develop`, and site and handbook changes into `main`.
+   These integration branches are explicit in `.gitmodules`.
+3. Create a short-lived branch from the latest parent `develop`.
+4. Check that the integration tips contain every expected commit:
+
+   ```bash
+   npm run release -- --check \
+     --expect 'console=<full-merged-commit-sha>' \
+     --expect 'site=<full-merged-commit-sha>' \
+     --expect 'handbook=<full-merged-commit-sha>'
+   ```
+
+   Replace each placeholder with a full 40-character commit SHA. Repeat `--expect`
+   for multiple companion commits in one part. For squash merges, use the resulting
+   merged commit, not the original feature commit.
+
+5. Run the same command without `--check` to update pins, install, build, commit, and push.
+   An optional quoted commit subject follows the expectations.
+6. Open its pull request against `develop`. Compare the recorded pins with the
+   expected companion list before calling the release complete.
+7. Merge the pull request and verify the exact `develop` Preview revision.
+8. Only with production approval, open and merge a pull request from `develop` to `main`.
+
+The check fetches component refs and verifies commit ancestry. It leaves pins and
+working files unchanged and runs no install, build, commit, or push.
+It requires initialized submodules, a clean parent and components, and a short-lived
+parent branch. A missing companion commit stops the release before any pin changes.
+The ordinary command checks again and pins the verified tips by exact SHA.
+Integration tips may include newer commits; review those additions too.
+The expected list defines the checked scope; the command does not discover unlisted PRs.
 
 Cloudflare keeps deployment history for rollback. Roll back by selecting the last
 working production deployment in the Pages dashboard.

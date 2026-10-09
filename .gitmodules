@@ -1,9 +1,12 @@
 [submodule "console"]
 	path = console
 	url = https://github.com/OpenFrayApp/console.git
+	branch = develop
 [submodule "site"]
 	path = site
 	url = https://github.com/OpenFrayApp/site.git
+	branch = main
 [submodule "handbook"]
 	path = handbook
 	url = https://github.com/OpenFrayApp/docs.git
+	branch = main
