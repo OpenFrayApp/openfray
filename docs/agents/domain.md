@@ -20,7 +20,9 @@ This project uses a multi-context layout. It covers:
 - The combat console
 - The marketing site and published libraries
 - The handbook
+- Administration and account email
 - The browser importer
 - The compendium ingest tooling
 
-`OpenFrayApp/importer` and `OpenFrayApp/compendium` are separate repositories referenced by the root context map.
+`OpenFrayApp/admin`, `OpenFrayApp/importer`, and `OpenFrayApp/compendium` are separate repositories referenced by the root context map.
+The admin repository is private and requires maintainer access.
