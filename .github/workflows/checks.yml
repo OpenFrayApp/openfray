@@ -31,5 +31,8 @@ jobs:
       - run: npm run typecheck
       - run: npx --no-install playwright install --with-deps chromium
       - run: npm run build
-      - run: npm test
+      - run: npx --no-install vitest run --maxWorkers=1
+      - run: npm exec --workspace console -- vitest run --maxWorkers=1
+      - run: npm run test:browser --workspace console
+      - run: npm test --workspace site
       - run: npm test --workspace handbook
