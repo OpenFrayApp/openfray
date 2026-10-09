@@ -87,10 +87,11 @@ npm run build
 ```
 
 `npm run build` builds all three parts and assembles `dist/`; `npm run test` chains
-every suite. `npm run release` prepares and pushes a coordinated update from a
-release branch. Merge it into `develop` for staging, then merge `develop` into `main`
-for production. See [Deployment](./docs/deployment.md) for the branch and database
-workflow.
+every suite. `npm run release` requires explicit expected commits for console,
+site, and handbook. Add `--check` to verify completeness before changing pins.
+The ordinary command prepares and pushes a coordinated update from a release branch.
+Merge it into `develop` for staging; production promotion requires separate approval.
+See [Deployment](./docs/deployment.md) for command syntax and the database workflow.
 
 How the repo is organized, the architectural rules, and the code style live in
 [`AGENTS.md`](./AGENTS.md); the writing style for every published word lives in
