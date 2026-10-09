@@ -57,6 +57,23 @@ while that revision remains live. Database history makes repeated runs duplicate
 A redeployment or rollback with already recorded dates sends nothing.
 Provider acceptance is distinct from delivery; arrival need not coincide with publication.
 
+## Automatic staging testing
+
+The `develop` workflow has a separate `register-staging` job and
+`legal-notices-staging` environment. Its repository gate is
+`LEGAL_STAGING_PUBLICATION_ENABLED=true`; it does not enable the production job.
+Configure that environment with the same Pages Read and hook secret names as the
+production job, but staging function and origin variables. Keep the gate disabled
+until the staging baseline is initialized against a verified preview deployment.
+
+Normal staging mail uses `ACCOUNT_MAIL_MODE=staging`,
+`ACCOUNT_STAGING_RECIPIENT_MODE=registered`, and the explicitly bound
+`ACCOUNT_STAGING_PROJECT_REF`. Recipients are the registered staging accounts,
+subjects retain `[Staging]`, and replies go to support. The one-minute staging
+scheduler processes welcome and legal jobs; authenticated deletion sends its
+confirmation after erasure. The confirmed-inbox override remains available for
+controlled smoke tests, not normal signup testing.
+
 ## Staging verification
 
 Use a separate staging database, an isolated HTTPS staging origin, and one maintainer-confirmed

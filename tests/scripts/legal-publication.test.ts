@@ -58,6 +58,46 @@ it('registers only a successfully published production commit verified against l
     },
   ])
 })
+it('registers a clean develop preview against its isolated staging metadata and hook', async () => {
+  const stagingOrigin = 'https://develop.example.test'
+  const functionUrl = 'https://staging.supabase.co/functions/v1/legal-publication'
+  vi.mocked(fetch).mockImplementation(async (url, init) => {
+    if (String(url).startsWith('https://api.cloudflare.com/'))
+      return Response.json({
+        success: true,
+        result: {
+          latest_deployment: {
+            ...deployment,
+            environment: 'preview',
+            deployment_trigger: {
+              metadata: { branch: 'develop', commit_hash: revision, commit_dirty: false },
+            },
+          },
+        },
+      })
+    if (String(url).startsWith(`${stagingOrigin}/legal-publication.json`))
+      return Response.json(metadata)
+    if (String(url) === functionUrl) {
+      registrations.push(JSON.parse(init!.body as string))
+      return Response.json({ result: 'terms' })
+    }
+    throw new Error('Unexpected request outside staging')
+  })
+  expect(
+    await registerPublishedLegalDates({
+      ...options,
+      mode: 'staging',
+      approval: 'staging',
+      stagingOrigin,
+      functionUrl,
+    }),
+  ).toEqual({ result: 'terms', revision })
+  expect(registrations).toHaveLength(1)
+  expect(
+    vi.mocked(fetch).mock.calls.some(([url]) => String(url).startsWith('https://openfray.app/')),
+  ).toBe(false)
+})
+
 it.each(['staging', 'unknown', ''])('does not trigger production for mode %s', async (mode) => {
   await expect(registerPublishedLegalDates({ ...options, mode })).rejects.toThrow()
   expect(fetch).not.toHaveBeenCalled()
