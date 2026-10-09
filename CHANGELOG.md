@@ -10,6 +10,11 @@ Versions through 1.2.0 record the console’s release history.
 - An optional guided tutorial takes about five minutes and uses the console’s real controls to set up and run a practice fight. ([console#97](https://github.com/OpenFrayApp/console/issues/97))
   Restart from **Settings** or search; exiting preserves your working board.
   Anonymous users can sign in or continue without an account after clearing everyone and the game log.
+- Sign in with Patreon alongside Google and Discord.
+- New accounts receive one welcome email with getting-started pointers and console and handbook links after mail delivery is activated. ([console#110](https://github.com/OpenFrayApp/console/issues/110))
+- After activation, account deletion attempts one confirmation email without retaining a recipient or scheduling retries. ([console#112](https://github.com/OpenFrayApp/console/issues/112))
+- After activation, existing accounts receive notices of published Terms or Privacy date changes, combined when both change together. ([console#111](https://github.com/OpenFrayApp/console/issues/111))
+- Authorized operators can preview and confirm reviewed security notices for explicitly selected affected accounts after mail delivery is activated. ([console#113](https://github.com/OpenFrayApp/console/issues/113))
 
 ## 1.3.1 (2026-10-03)
 

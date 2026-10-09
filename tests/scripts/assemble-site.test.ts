@@ -26,6 +26,15 @@ beforeEach(() => {
   file('site/dist/index.html', '<html>home</html>')
   file('site/dist/404.html', '<html>site not found</html>')
   file('site/dist/privacy/index.html')
+  file(
+    'site/dist/legal-publication.json',
+    JSON.stringify({
+      schemaVersion: 1,
+      revision: 'a'.repeat(40),
+      terms: '2026-10-08',
+      privacy: '2026-10-07',
+    }),
+  )
   file('site/dist/the-waking-garden/index.html')
   file('site/dist/the-waking-garden/print/index.html', '<html>print</html>')
   file('site/dist/brood-and-bloom/index.html')
@@ -83,6 +92,18 @@ describe('assemble-site', () => {
     expect(readFileSync(join(dir, 'dist/index.html'), 'utf8')).toContain('home')
     expect(readFileSync(join(dir, 'dist/docs/index.html'), 'utf8')).toContain('docs')
     expect(existsSync(join(dir, 'dist/privacy/index.html'))).toBe(true)
+  })
+
+  it('preserves the site-owned legal dates and exact deployment revision without notification side effects', () => {
+    expect(JSON.parse(readFileSync(join(dir, 'dist/legal-publication.json'), 'utf8'))).toEqual({
+      schemaVersion: 1,
+      revision: 'a'.repeat(40),
+      terms: '2026-10-08',
+      privacy: '2026-10-07',
+    })
+    expect(readFileSync(SCRIPT, 'utf8')).not.toMatch(
+      /registerPublishedLegalDates|LEGAL_PUBLICATION_HOOK_KEY|api\.resend\.com/,
+    )
   })
 
   it('leaves the Vite-built console where it is', () => {
