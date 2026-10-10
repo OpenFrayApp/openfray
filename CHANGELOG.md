@@ -7,7 +7,7 @@ Versions through 1.2.0 record the console’s release history.
 
 ### Added
 
-- Three optional reference libraries add 655 spell cards from Kibbles’ Casting Compendium v2.3, Spells That Don’t Suck, and So Many Spells.
+- Four optional reference libraries add 745 spell cards from Kibbles’ Casting Compendium v2.3, Spells That Don’t Suck, So Many Spells, and Tome of Heroes.
   Roll their dice and apply their effects manually. Credits and licenses are linked from the console and site.
 - An optional guided tutorial takes about five minutes and uses the console’s real controls to set up and run a practice fight. ([console#97](https://github.com/OpenFrayApp/console/issues/97))
   Restart from **Settings** or search; exiting preserves your working board.
