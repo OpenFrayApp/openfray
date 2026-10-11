@@ -11,7 +11,8 @@ Ordinary categories create public issues in `OpenFrayApp/console`. Each issue re
 Every issue is assigned to `SirDarcanos`. Category is included in the body.
 Release-impact and readiness labels remain maintainer decisions.
 
-Issue creation precedes separate label and assignment requests. Confirmed creation remains
+Issue creation precedes assignment, followed by labels. Assignment finishes before labels
+are added because GitHub assignment re-emits existing label events. Confirmed creation remains
 successful if metadata fails. Diagnostics name only the failed metadata operation.
 
 A failed or uncertain creation attempts email through Resend to `reports@openfray.app`.
@@ -66,7 +67,7 @@ invoke either delivery provider. No request content or provider error body is lo
 Responses are uncached and carry an opaque request identifier.
 
 The route has a 15-second budget. Verification gets at most three seconds; issue creation
-gets four; parallel metadata updates get two; email gets five. Provider response bodies
+gets four; each ordered metadata update gets two; email gets five. Provider response bodies
 are bounded. The client stops waiting after 20 seconds and preserves an unconfirmed draft.
 
 ## Verify before activation

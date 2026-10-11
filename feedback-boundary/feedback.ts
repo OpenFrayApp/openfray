@@ -112,23 +112,22 @@ async function issue(
     'needs-triage',
     ...(draft.category === 'bug' ? ['bug'] : draft.category === 'feature' ? ['enhancement'] : []),
   ]
-  await Promise.all(
-    [
-      { path: 'labels', body: { labels } },
-      { path: 'assignees', body: { assignees: ['SirDarcanos'] } },
-    ].map(async ({ path, body }) => {
-      const result = await boundedJson(
-        fetcher,
-        `${base}/${row.number}/${path}`,
-        { method: 'POST', headers, body: JSON.stringify(body) },
-        { timeoutMs: Math.min(2_000, remainingTime(deadline)), responseBytes: 65_536 },
+  // GitHub assignment re-emits existing label events, so assign the unlabeled issue first.
+  for (const { path, body } of [
+    { path: 'assignees', body: { assignees: ['SirDarcanos'] } },
+    { path: 'labels', body: { labels } },
+  ]) {
+    const metadata = await boundedJson(
+      fetcher,
+      `${base}/${row.number}/${path}`,
+      { method: 'POST', headers, body: JSON.stringify(body) },
+      { timeoutMs: Math.min(2_000, remainingTime(deadline)), responseBytes: 65_536 },
+    )
+    if (metadata.status !== 'ok' || !metadata.response.ok)
+      console.warn(
+        JSON.stringify({ kind: 'feedback-metadata', operation: path, outcome: 'failed' }),
       )
-      if (result.status !== 'ok' || !result.response.ok)
-        console.warn(
-          JSON.stringify({ kind: 'feedback-metadata', operation: path, outcome: 'failed' }),
-        )
-    }),
-  )
+  }
   return url
 }
 
