@@ -51,8 +51,40 @@ it('creates a public bug issue with triage labels and the fixed assignee', async
     title: 'Synthetic report',
     body: 'Category: Bug\n\nSynthetic details',
   })
-  expect(JSON.parse(network.mock.calls[2][1].body)).toEqual({ labels: ['needs-triage', 'bug'] })
-  expect(JSON.parse(network.mock.calls[3][1].body)).toEqual({ assignees: ['SirDarcanos'] })
+  expect(network).toHaveBeenCalledTimes(4)
+  expect(network.mock.calls[2][0]).toBe(
+    'https://api.github.com/repos/OpenFrayApp/console/issues/42/assignees',
+  )
+  expect(JSON.parse(network.mock.calls[2][1].body)).toEqual({ assignees: ['SirDarcanos'] })
+  expect(network.mock.calls[3][0]).toBe(
+    'https://api.github.com/repos/OpenFrayApp/console/issues/42/labels',
+  )
+  expect(JSON.parse(network.mock.calls[3][1].body)).toEqual({ labels: ['needs-triage', 'bug'] })
+})
+
+it('waits for assignment to finish before adding labels', async () => {
+  let finishAssignment!: (response: Response) => void
+  const network = vi
+    .fn()
+    .mockResolvedValueOnce(
+      Response.json({ success: true, action: 'report', hostname: 'openfray.app' }),
+    )
+    .mockResolvedValueOnce(Response.json({ number: 42 }, { status: 201 }))
+    .mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          finishAssignment = resolve
+        }),
+    )
+    .mockResolvedValueOnce(Response.json({}))
+  const pending = handleFeedbackRequest(request('bug'), env, network)
+  await vi.waitFor(() => expect(network).toHaveBeenCalledTimes(3))
+  expect(network.mock.calls.some(([url]) => String(url).endsWith('/labels'))).toBe(false)
+  finishAssignment(Response.json({}))
+  expect((await pending).status).toBe(201)
+  expect(network.mock.calls[3][0]).toBe(
+    'https://api.github.com/repos/OpenFrayApp/console/issues/42/labels',
+  )
 })
 
 it('sends Security privately by email without calling GitHub', async () => {
@@ -106,7 +138,7 @@ it('does not email again when issue metadata fails after confirmed creation', as
       result: 'issue',
       url: 'https://github.com/OpenFrayApp/console/issues/42',
     })
-    expect(JSON.parse(network.mock.calls[2][1].body)).toEqual({
+    expect(JSON.parse(network.mock.calls[3][1].body)).toEqual({
       labels: ['needs-triage', 'enhancement'],
     })
     expect(network.mock.calls.some(([url]) => url === 'https://api.resend.com/emails')).toBe(false)

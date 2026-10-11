@@ -8,6 +8,7 @@ Versions through 1.2.0 record the console’s release history.
 ### Added
 
 - **Share feedback** submits public GitHub issues from the console, with optional bug diagnostics and email fallback; security reports go privately by email. ([console#130](https://github.com/OpenFrayApp/console/issues/130))
+  Issue timelines avoid duplicate label events; confirmation actions share consistent sizing.
 - Six optional spell libraries add 1,283 cards.
   Sources include Deep Magic, Tome of Heroes, Warlock Grimoire, Kibbles’ Casting Compendium v2.3, So Many Spells, and Spells That Don’t Suck.
   Casting uses supported combat effects and concise creature reminders; unmodeled rules remain in the spell text.
