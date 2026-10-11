@@ -9,7 +9,18 @@ Versions through 1.2.0 record the console’s release history.
 
 - Five optional reference libraries add 1,248 spell cards, including 503 from Deep Magic 2020.
   Sources also include Kibbles’ Casting Compendium v2.3, Spells That Don’t Suck, So Many Spells, and Tome of Heroes.
-  Roll their dice and apply their effects manually. Credits and licenses are linked from the console and site.
+  All 90 Tome of Heroes spells have reviewed casting rules: 39 integrate initial saves or attacks, and 23 offer tracked effects or reminders.
+  The other 28 remain manual-only with spell-specific guidance. Casting controls identify rules requiring manual resolution, including later triggers and conditional checks.
+  So Many Spells has 179 reviewed cards: 71 integrate initial saves or attacks, and 43 offer tracked effects or reminders.
+  The remaining 65 stay manual-only, with guidance for mixed outcomes, later hazards, summons, and printed ambiguities.
+  Spells That Don’t Suck has 181 reviewed cards: 56 integrate initial saves or attacks, and 65 offer tracked effects or reminders.
+  The remaining 60 stay manual-only, including rolled damage types, weapon-dependent attacks, and mixed save outcomes.
+  Kibbles’ Casting Compendium v2.3 has 295 reviewed cards: 121 integrate initial saves or attacks, and 106 offer tracked effects or reminders.
+  The remaining 68 stay manual-only, including movement-dependent saves, weapon attacks, HP loss, and mixed outcomes.
+  All 503 Deep Magic 2020 cards have reviewed casting rules: 169 integrate initial saves or attacks, and 200 offer tracked reminders.
+  The remaining 134 stay manual-only, including mixed outcomes, weapon-dependent attacks, rolled damage types, and time manipulation.
+  All 1,248 cards have source-specific verdicts; casting guidance identifies later saves, conditional benefits, and other rules requiring manual resolution.
+  Credits and licenses are linked from the console and site.
 - An optional guided tutorial takes about five minutes and uses the console’s real controls to set up and run a practice fight. ([console#97](https://github.com/OpenFrayApp/console/issues/97))
   Restart from **Settings** or search; exiting preserves your working board.
   Anonymous users can sign in or continue without an account after clearing everyone and the game log.
