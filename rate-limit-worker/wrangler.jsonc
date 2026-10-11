@@ -4,6 +4,11 @@
   "compatibility_date": "2026-09-10",
   "ratelimits": [
     {
+      "name": "FEEDBACK_RATE_LIMIT",
+      "namespace_id": "1005",
+      "simple": { "limit": 5, "period": 60 },
+    },
+    {
       "name": "SHARE_RATE_LIMIT",
       "namespace_id": "1001",
       "simple": { "limit": 120, "period": 60 },

@@ -10,6 +10,7 @@ interface Env {
   IMAGE_RATE_LIMIT: RateLimitBinding
   REPORT_RATE_LIMIT: RateLimitBinding
   CSP_REPORT_RATE_LIMIT: RateLimitBinding
+  FEEDBACK_RATE_LIMIT: RateLimitBinding
 }
 
 const KEY = /^[0-9a-f]{64}$/
@@ -19,6 +20,7 @@ function binding(env: Env, route: string): RateLimitBinding | null {
   if (route === 'share') return env.SHARE_RATE_LIMIT
   if (route === 'image') return env.IMAGE_RATE_LIMIT
   if (route === 'report') return env.REPORT_RATE_LIMIT
+  if (route === 'feedback') return env.FEEDBACK_RATE_LIMIT
   if (route === 'csp-report') return env.CSP_REPORT_RATE_LIMIT
   return null
 }
