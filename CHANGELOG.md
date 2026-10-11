@@ -7,8 +7,8 @@ Versions through 1.2.0 record the console’s release history.
 
 ### Added
 
-- Five optional spell libraries add 1,248 cards.
-  Sources include Deep Magic 2020, Tome of Heroes, Kibbles’ Casting Compendium v2.3, So Many Spells, and Spells That Don’t Suck.
+- Six optional spell libraries add 1,283 cards.
+  Sources include Deep Magic 2020, Tome of Heroes, Warlock Grimoire, Kibbles’ Casting Compendium v2.3, So Many Spells, and Spells That Don’t Suck.
   Casting uses supported combat effects and concise creature reminders; unmodeled rules remain in the spell text.
   Credits and licenses are linked from the console and site.
 - An optional guided tutorial takes about five minutes and uses the console’s real controls to set up and run a practice fight. ([console#97](https://github.com/OpenFrayApp/console/issues/97))
@@ -18,6 +18,10 @@ Versions through 1.2.0 record the console’s release history.
 - New accounts receive one welcome email with getting-started pointers and console and handbook links after mail delivery is activated. ([console#110](https://github.com/OpenFrayApp/console/issues/110))
 - After activation, account deletion attempts one confirmation email without retaining a recipient or scheduling retries. ([console#112](https://github.com/OpenFrayApp/console/issues/112))
 - Reviewed templates support manual Terms, Privacy, combined policy, and security notices sent through Resend. ([console#111](https://github.com/OpenFrayApp/console/issues/111), [console#113](https://github.com/OpenFrayApp/console/issues/113))
+
+### Changed
+
+- somanyrobots source tags use fuchsia to distinguish them from Core tags.
 
 ## 1.3.1 (2026-10-03)
 
