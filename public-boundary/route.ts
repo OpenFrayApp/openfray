@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Nicola Mustone
 
-export type PublicRouteName = 'share' | 'image' | 'report' | 'csp-report'
+import { FEEDBACK_LIMITS } from '../console/src/feedback/index.ts'
+
+export type PublicRouteName = 'share' | 'image' | 'report' | 'feedback' | 'csp-report'
 
 export interface PublicRoutePolicy {
   name: PublicRouteName
@@ -72,6 +74,14 @@ export const PUBLIC_ROUTE_POLICIES = {
     windowMs: 60_000,
     timeoutMs: 5_000,
     requestBytes: 4_096,
+    responseBytes: 65_536,
+  },
+  feedback: {
+    name: 'feedback',
+    requests: 5,
+    windowMs: 60_000,
+    timeoutMs: 15_000,
+    requestBytes: FEEDBACK_LIMITS.requestBytes,
     responseBytes: 65_536,
   },
   'csp-report': {

@@ -13,6 +13,7 @@ function env(success: boolean) {
       SHARE_RATE_LIMIT: binding,
       IMAGE_RATE_LIMIT: binding,
       REPORT_RATE_LIMIT: binding,
+      FEEDBACK_RATE_LIMIT: binding,
       CSP_REPORT_RATE_LIMIT: binding,
     },
     limit,
@@ -28,7 +29,7 @@ function request(route: string, key = 'a'.repeat(64)): Request {
 }
 
 describe('shared public route limiter Worker', () => {
-  it.each(['share', 'image', 'report', 'csp-report'])(
+  it.each(['share', 'image', 'report', 'feedback', 'csp-report'])(
     'selects the %s route binding',
     async (route) => {
       const { environment, limit } = env(true)

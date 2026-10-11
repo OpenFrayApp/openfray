@@ -18,6 +18,7 @@ values for Preview and the production values for Production.
 
 Configure the Pages Functions values from [the report boundary guide](./report-boundary.md)
 and [the public route boundary guide](./public-route-boundary.md) in both environments.
+Configure console feedback using [the feedback boundary guide](./feedback-boundary.md).
 Each environment uses its own Supabase project, Turnstile keys, report keys, and
 public-route fingerprint key.
 

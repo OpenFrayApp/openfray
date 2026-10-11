@@ -1,15 +1,16 @@
 # Public route boundary
 
-The public share, image, anonymous-report, and CSP-report routes use the controls in `public-boundary/route.ts`. Every route has an independent fixed-window threshold. The table lists the configured Cloudflare threshold.
+The public share, image, anonymous-report, console-feedback, and CSP-report routes use the controls in `public-boundary/route.ts`. Every route has an independent fixed-window threshold. The table lists the configured Cloudflare threshold.
 
-| Route            |               Threshold |  Deadline |               Request ceiling |                                          Upstream or output ceiling |
-| ---------------- | ----------------------: | --------: | ----------------------------: | ------------------------------------------------------------------: |
-| Share HTML       | 120 requests per minute | 2 seconds | URL and capability validation |                                            64 KiB per JSON response |
-| Share image      |  30 requests per minute | 4 seconds | URL and capability validation |                              1 MiB rendered image; 512 KiB per font |
-| Anonymous report |  10 requests per minute | 5 seconds |                         4 KiB | 64 KiB share response; smaller verification and insertion responses |
-| CSP report       |  60 requests per minute |  1 second |                         4 KiB |                                                No upstream response |
+| Route            |               Threshold |   Deadline |               Request ceiling |                                          Upstream or output ceiling |
+| ---------------- | ----------------------: | ---------: | ----------------------------: | ------------------------------------------------------------------: |
+| Share HTML       | 120 requests per minute |  2 seconds | URL and capability validation |                                            64 KiB per JSON response |
+| Share image      |  30 requests per minute |  4 seconds | URL and capability validation |                              1 MiB rendered image; 512 KiB per font |
+| Anonymous report |  10 requests per minute |  5 seconds |                         4 KiB | 64 KiB share response; smaller verification and insertion responses |
+| Console feedback |   5 requests per minute | 15 seconds |                        40 KiB |      64 KiB GitHub response; 8 KiB verification and email responses |
+| CSP report       |  60 requests per minute |   1 second |                         4 KiB |                                                No upstream response |
 
-Pages derives an opaque network key with `PUBLIC_ROUTE_FINGERPRINT_KEY`. The private `PUBLIC_ROUTE_RATE_LIMITER` service binding sends that key to `rate-limit-worker/index.ts`. The Worker applies the four native Cloudflare counters in `rate-limit-worker/wrangler.jsonc`.
+Pages derives an opaque network key with `PUBLIC_ROUTE_FINGERPRINT_KEY`. The private `PUBLIC_ROUTE_RATE_LIMITER` service binding sends that key to `rate-limit-worker/index.ts`. The Worker applies the five native Cloudflare counters in `rate-limit-worker/wrangler.jsonc`.
 
 A missing service binding or fingerprint key rejects public work. Unit tests use the bounded in-memory implementation. Supabase still enforces strict per-share, network, and duplicate quotas for anonymous reports.
 
