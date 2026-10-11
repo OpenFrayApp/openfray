@@ -56,7 +56,7 @@ Unknown fields are discarded. Expected behavior and technical details are discar
 all non-bug categories, including Security.
 
 Bug diagnostics are opt-in. They contain bounded browser and operating-system labels,
-viewport dimensions, and creature, player-character, and quick-add NPC counts.
+viewport dimensions, and creature, player-character, and quick-add nonplayer-character counts.
 They contain no console version, raw user agent, account identifiers, URLs, creature names,
 stats, notes, or game log. The submitted snapshot matches the visible preview.
 
