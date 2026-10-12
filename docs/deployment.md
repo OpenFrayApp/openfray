@@ -81,6 +81,8 @@ npx --no-install vitest run tests/scripts/auth-routing.preview.test.ts
 
 Install Playwright Chromium first if absent: `npx --no-install playwright install chromium`.
 The preview suite permits only a loopback HTTP origin and blocks browser requests to other origins.
+Node HTTP requests follow redirects manually and reject destinations outside the preview origin before requesting them.
+Script downloads ignore external analytics references and require at least one local module.
 It checks direct visits, slash normalization, query preservation, reloads, script delivery, and a blocked mock provider handoff.
 It also checks callback scrubbing, unmatched-attempt failure, enforced CSP, referrer policy, caching, and console worker scope.
 Read the Wrangler output for `Infinite loop detected in this rule`.

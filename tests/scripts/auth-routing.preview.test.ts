@@ -3,6 +3,7 @@
 
 import { chromium, type Browser, type BrowserContext } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { fetchPreview, fetchPreviewScripts } from './preview-http'
 
 const origin = process.env.OPENFRAY_PAGES_ORIGIN
 const routes = ['/sign-in/', '/sign-up/', '/auth/callback/']
@@ -35,7 +36,7 @@ describe.skipIf(!origin)('assembled Pages auth routing', () => {
         path === '/auth/callback/'
           ? '?attempt=mock-attempt-0123456789'
           : '?returnTo=%2Fconsole%2F%3Fview%3Dboard%23round-2'
-      const response = await fetch(`${origin}${path.slice(0, -1)}${query}`)
+      const response = await fetchPreview(`${origin}${path.slice(0, -1)}${query}`, origin!)
       expect(response.status).toBe(200)
       expect(new URL(response.url).pathname).toBe(path)
       expect(new URL(response.url).search).toBe(query)
@@ -49,17 +50,15 @@ describe.skipIf(!origin)('assembled Pages auth routing', () => {
       )
       expect(response.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin')
       expect(response.headers.get('cache-control') || '').not.toContain('immutable')
-      const reload = await fetch(response.url)
+      const reload = await fetchPreview(response.url, origin!)
       expect(reload.status).toBe(200)
       expect(await reload.text()).toBe(html)
-      const scripts = [...html.matchAll(/<script\b[^>]*src="([^"]+)"/g)].map((match) => match[1])
-      expect(scripts.length).toBeGreaterThan(0)
-      for (const script of scripts) {
-        const asset = await fetch(new URL(script, origin))
+      const scripts = await fetchPreviewScripts(html, origin!)
+      for (const { url, response: asset } of scripts) {
         expect(asset.status).toBe(200)
         expect(asset.headers.get('content-type')).toMatch(/javascript/)
         expect(await asset.text()).not.toMatch(/^\s*<!doctype html/i)
-        if (script.startsWith('/_astro/'))
+        if (url.pathname.startsWith('/_astro/'))
           expect(asset.headers.get('cache-control')).toContain('immutable')
       }
       if (path === '/auth/callback/') {
