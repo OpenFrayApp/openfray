@@ -44,7 +44,7 @@ Both disable automatic URL session detection. Only the site validates attempts a
 Read the [site auth contract](../site/docs/development/authentication.md) for return validation and attempt handling.
 
 Keep #139 unreleased until #140 supplies `/account/`, its direct-entry fallback.
-Console candidate acceptance, handbook updates, and integrated publication review remain release gates.
+Handbook updates, successful authenticated cross-surface verification, and integrated publication review remain release gates.
 These source changes do not enable newsletter subscriptions or authorize provider configuration.
 
 Document the Supabase allowlist before activation. For production, the restricted pattern is
