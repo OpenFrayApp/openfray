@@ -35,7 +35,7 @@ public-route fingerprint key.
 
 ## Authentication integration
 
-The site serves static `/sign-in/`, `/sign-up/`, and `/auth/callback/` pages.
+The site serves static `/sign-in/`, `/sign-up/`, `/auth/callback/`, and `/account/` pages.
 Pages normalizes their trailing slashes while preserving queries. They need no custom rewrite.
 Keep `/_astro/` and `/console/assets/` outside auth rewrites so JavaScript keeps its correct content type.
 The console consumes the shared session; the site owns provider initiation and callback completion.
@@ -43,8 +43,9 @@ Both use Supabase SDK 2.108.2, its default storage key, persistent sessions, aut
 Both disable automatic URL session detection. Only the site validates attempts and installs callback sessions.
 Read the [site auth contract](../site/docs/development/authentication.md) for return validation and attempt handling.
 
-Keep #139 unreleased until #140 supplies `/account/`, its direct-entry fallback.
-Handbook updates, successful authenticated cross-surface verification, and integrated publication review remain release gates.
+Keep #139 and #140 unreleased until the account source and assembled verification pass independent review.
+Handbook updates and integrated publication review remain release gates.
+Detached prototype gitlinks in a verification branch do not authorize release or deployment.
 These source changes do not enable newsletter subscriptions or authorize provider configuration.
 
 Document the Supabase allowlist before activation. For production, the restricted pattern is
@@ -76,7 +77,7 @@ In another terminal at the repository root, run:
 
 ```bash
 OPENFRAY_PAGES_ORIGIN=http://127.0.0.1:8799 \
-npx --no-install vitest run tests/scripts/auth-routing.preview.test.ts
+npx --no-install vitest run tests/scripts/auth-routing.preview.test.ts tests/scripts/account.preview.test.ts
 ```
 
 Install Playwright Chromium first if absent: `npx --no-install playwright install chromium`.
@@ -90,7 +91,15 @@ The suite skips without `OPENFRAY_PAGES_ORIGIN`; ordinary parent tests cover ass
 
 This isolated preview serves static assets without Pages Functions or server bindings.
 Parent function tests cover their boundaries separately. No live OAuth, Supabase, or email operation is required.
-Console tests cover board recovery, cloud separation, and identity renewal; static routing checks do not establish those guarantees.
+The account suite executes assembled site and console modules in Chromium with the real Supabase SDK and native browser storage.
+It creates working boards through console controls and checks departure checkpoints, trusted profile return reads, and unchanged SDK bytes.
+It also checks nested signup callbacks, captured-bearer termination, replacement sessions, and anonymous recovery isolation.
+Explicit board choices use real sessionStorage and IndexedDB, including a mocked offline remount.
+The offline case mocks `navigator.onLine`; it does not establish service-worker offline delivery.
+HTTP responses come from a bounded synthetic bearer registry. Requested target fields never select the response actor.
+External auth, provider, analytics, and realtime requests are intercepted without reaching those services.
+These checks do not verify JWT signatures, database authorization, live OAuth, mail delivery, or provider configuration.
+Console and site unit suites remain separate evidence; their mocked DOM checks do not establish assembled browser behavior.
 
 ### Response and offline boundaries
 
