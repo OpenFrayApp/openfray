@@ -27,6 +27,19 @@ beforeEach(() => {
   file('site/dist/404.html', '<html>site not found</html>')
   file('site/dist/privacy/index.html')
   file(
+    'site/dist/sign-in/index.html',
+    '<html>sign in<script src="/_astro/auth.js"></script></html>',
+  )
+  file(
+    'site/dist/sign-up/index.html',
+    '<html>sign up<script src="/_astro/auth.js"></script></html>',
+  )
+  file(
+    'site/dist/auth/callback/index.html',
+    '<html>callback<script src="/_astro/auth.js"></script></html>',
+  )
+  file('site/dist/_astro/auth.js', 'export const auth = true')
+  file(
     'site/dist/legal-publication.json',
     JSON.stringify({
       schemaVersion: 1,
@@ -104,6 +117,17 @@ describe('assemble-site', () => {
     expect(readFileSync(SCRIPT, 'utf8')).not.toMatch(
       /registerPublishedLegalDates|LEGAL_PUBLICATION_HOOK_KEY|api\.resend\.com/,
     )
+  })
+
+  it('ships real static auth pages and their scripts without auth or asset rewrites', () => {
+    for (const route of ['sign-in', 'sign-up', 'auth/callback']) {
+      expect(readFileSync(join(dir, `dist/${route}/index.html`), 'utf8')).toContain(
+        '/_astro/auth.js',
+      )
+    }
+    expect(readFileSync(join(dir, 'dist/_astro/auth.js'), 'utf8')).toBe('export const auth = true')
+    const redirects = readFileSync(join(dir, 'dist/_redirects'), 'utf8')
+    expect(redirects).not.toMatch(/\/sign-in|\/sign-up|\/auth\/|\/_astro|^\/\*/m)
   })
 
   it('leaves the Vite-built console where it is', () => {

@@ -24,6 +24,8 @@ Versions through 1.2.0 record the console’s release history.
 
 ### Changed
 
+- Site-owned sign-in, sign-up, and OAuth callback pages return to validated destinations while preserving console recovery copies. ([console#139](https://github.com/OpenFrayApp/console/issues/139))
+  Source integration remains under review and unreleased until the account page is available; newsletter subscriptions remain unavailable. ([console#140](https://github.com/OpenFrayApp/console/issues/140))
 - somanyrobots source tags use fuchsia to distinguish them from Core tags.
   Warlock Grimoire and Creature Codex tags read WG and CC; Deep Magic and Khyberia use shorter display names.
 
