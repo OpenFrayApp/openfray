@@ -63,6 +63,7 @@ async function mockBackend(context: BrowserContext, sessions: Session[]) {
   )
   const rows = new Map<string, Row>()
   const calls: Call[] = []
+  const targetMismatches: Call[] = []
   const denied: string[] = []
   const unexpected: string[] = []
   const failures = new Set<string>()
@@ -84,7 +85,8 @@ async function mockBackend(context: BrowserContext, sessions: Session[]) {
     const body = request.postData() ? (request.postDataJSON() as Record<string, unknown>) : null
     const path = url.pathname
     const method = request.method()
-    calls.push({ path, method, actor: user?.id ?? null, bearer, body })
+    const call = { path, method, actor: user?.id ?? null, bearer, body }
+    calls.push(call)
     /** Send one bounded JSON result from the synthetic backend. */
     const reply = (value: unknown, status = 200) =>
       route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value) })
@@ -113,9 +115,20 @@ async function mockBackend(context: BrowserContext, sessions: Session[]) {
     if (path === '/rest/v1/rpc/stop_all_live_views') return reply(null)
     if (path === '/rest/v1/rpc/save_encounter_revision') {
       if (body?.want_owner !== user.id) return reply({ message: 'Wrong actor' }, 403)
+      if (body.expected_revision == null || body.want_writer == null)
+        return reply({ message: 'Expected revision and writer required' }, 400)
       const prior = rows.get(user.id)
-      if (body?.expected_revision !== (prior?.revision ?? 0))
-        return reply({ status: 'stale', revision: prior?.revision ?? 0 })
+      if (body.want_encounter === null) {
+        if (body.expected_revision !== 0) return reply({ status: 'stale', revision: 0 })
+        if (prior) return reply({ status: 'stale', revision: prior.revision })
+      } else {
+        if (!prior || body.want_encounter !== prior.id) {
+          targetMismatches.push(call)
+          return reply({ message: 'Owned live encounter required' }, 400)
+        }
+        if (body.expected_revision !== prior.revision)
+          return reply({ status: 'stale', revision: prior.revision })
+      }
       const row: Row = {
         id: prior?.id ?? `encounter-${user.id}`,
         state: structuredClone(body?.want_state) as Encounter,
@@ -128,16 +141,17 @@ async function mockBackend(context: BrowserContext, sessions: Session[]) {
         status: 'saved',
         id: row.id,
         revision: row.revision,
-        leaseToken: 'synthetic-lease',
+        leaseToken: body.want_writer,
       })
     }
     if (path === '/rest/v1/rpc/claim_encounter_writer') {
+      if (body?.want_writer == null) return reply({ message: 'Writer required' }, 400)
       const row = rows.get(user.id)
-      return reply({
-        status: 'acquired',
-        revision: row?.revision ?? 0,
-        leaseToken: 'synthetic-lease',
-      })
+      if (!row || body.want_encounter !== row.id) {
+        targetMismatches.push(call)
+        return reply({ message: 'Owned live encounter required' }, 400)
+      }
+      return reply({ status: 'acquired', revision: row.revision, leaseToken: body.want_writer })
     }
     if (method === 'GET' && path === '/rest/v1/encounters') {
       return reply(
@@ -161,6 +175,7 @@ async function mockBackend(context: BrowserContext, sessions: Session[]) {
     users,
     rows,
     calls,
+    targetMismatches,
     failures,
     denied,
     unexpected,
@@ -256,6 +271,30 @@ async function replaceNative(page: Page, session: Session) {
   )
 }
 
+/** Dispatch a synthetic RPC through the guarded browser transport with an explicit registered bearer. */
+async function postMockRpc(
+  page: Page,
+  session: Session,
+  rpc: 'save_encounter_revision' | 'claim_encounter_writer',
+  body: Record<string, unknown>,
+) {
+  return page.evaluate(
+    async ({ project, token, rpc, body }) => {
+      const response = await fetch(`${project}/rest/v1/rpc/${rpc}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(
+          rpc === 'claim_encounter_writer'
+            ? { want_encounter: body.want_encounter, want_writer: body.want_writer }
+            : body,
+        ),
+      })
+      return { status: response.status, body: await response.json() }
+    },
+    { project, token: session.access_token, rpc, body },
+  )
+}
+
 describe.skipIf(!origin)('assembled account and console session boundary', () => {
   beforeAll(async () => {
     const target = new URL(origin!)
@@ -272,6 +311,145 @@ describe.skipIf(!origin)('assembled account and console session boundary', () =>
   afterAll(async () => {
     await browser?.close()
   })
+
+  it.each(['save_encounter_revision', 'claim_encounter_writer'] as const)(
+    'mock %s rejects foreign and missing targets for each bearer actor',
+    async (rpc) => {
+      const first = syntheticSession(10)
+      const second = syntheticSession(11)
+      const context = await browser.newContext({
+        viewport: { width: 1600, height: 1000 },
+        serviceWorkers: 'block',
+      })
+      const backend = await mockBackend(context, [first, second])
+      let page = await newPage(context, first)
+      try {
+        await page.goto(`${origin}/console/`)
+        await consoleReady(page)
+        await quickAdd(page, 'First target fidelity board')
+        await expect.poll(() => backend.rows.has(first.user.id)).toBe(true)
+        const firstRow = structuredClone(backend.rows.get(first.user.id)!)
+        const firstWriter = backend.calls.find(
+          (call) => call.actor === first.user.id && call.path.endsWith('save_encounter_revision'),
+        )!.body!.want_writer
+        const absentActor = await postMockRpc(page, second, rpc, {
+          want_owner: second.user.id,
+          want_encounter: firstRow.id,
+          expected_revision: 0,
+          want_writer: firstWriter,
+          want_state: firstRow.state,
+          want_updated_at: firstRow.updated_at,
+        })
+        expect(absentActor.status).toBe(400)
+        const rejectedTargets: Array<[string, unknown]> = [[second.user.id, firstRow.id]]
+        expect(backend.rows.has(second.user.id)).toBe(false)
+        expect(backend.rows.get(first.user.id)).toEqual(firstRow)
+        await page.close()
+        page = await newPage(context, second)
+        await page.goto(`${origin}/console/`)
+        await consoleReady(page)
+        await quickAdd(page, 'Second target fidelity board')
+        await expect.poll(() => backend.rows.has(second.user.id)).toBe(true)
+        await page.goto(`${origin}/privacy/`)
+        const registeredRows = structuredClone(backend.rows)
+        for (const [actor, other] of [
+          [first, second],
+          [second, first],
+        ]) {
+          const owned = registeredRows.get(actor.user.id)!
+          const writer = backend.calls.find(
+            (call) => call.actor === actor.user.id && call.path.endsWith('save_encounter_revision'),
+          )!.body!.want_writer
+          expect(typeof writer).toBe('string')
+          const foreign = registeredRows.get(other.user.id)!
+          for (const target of [foreign.id, '00000000-0000-4000-8000-999999999999']) {
+            const unchangedRows = structuredClone(backend.rows)
+            const result = await postMockRpc(page, actor, rpc, {
+              want_owner: actor.user.id,
+              want_encounter: target,
+              expected_revision: owned.revision,
+              want_writer: writer,
+              want_state: owned.state,
+              want_updated_at: owned.updated_at,
+            })
+            expect(result.status).toBe(400)
+            rejectedTargets.push([actor.user.id, target])
+            expect(backend.rows).toEqual(unchangedRows)
+          }
+          if (rpc === 'claim_encounter_writer') {
+            const missing = await postMockRpc(page, actor, rpc, {
+              want_encounter: null,
+              want_writer: writer,
+            })
+            expect(missing.status).toBe(400)
+            rejectedTargets.push([actor.user.id, null])
+          }
+          const legitimate = await postMockRpc(page, actor, rpc, {
+            want_owner: actor.user.id,
+            want_encounter: owned.id,
+            expected_revision: owned.revision,
+            want_writer: writer,
+            want_state: owned.state,
+            want_updated_at: owned.updated_at,
+          })
+          expect(legitimate.status).toBe(200)
+          expect(legitimate.body).toMatchObject(
+            rpc === 'claim_encounter_writer'
+              ? { status: 'acquired', revision: owned.revision, leaseToken: writer }
+              : { status: 'saved', id: owned.id, revision: owned.revision + 1, leaseToken: writer },
+          )
+          expect(backend.rows.get(actor.user.id)!.state).toEqual(owned.state)
+          if (rpc === 'save_encounter_revision') {
+            const saved = structuredClone(backend.rows.get(actor.user.id)!)
+            const stale = await postMockRpc(page, actor, rpc, {
+              want_owner: actor.user.id,
+              want_encounter: owned.id,
+              expected_revision: owned.revision,
+              want_writer: writer,
+              want_state: owned.state,
+              want_updated_at: owned.updated_at,
+            })
+            expect(stale.body).toMatchObject({ status: 'stale', revision: owned.revision + 1 })
+            const duplicate = await postMockRpc(page, actor, rpc, {
+              want_owner: actor.user.id,
+              want_encounter: null,
+              expected_revision: 0,
+              want_writer: writer,
+              want_state: owned.state,
+              want_updated_at: owned.updated_at,
+            })
+            expect(duplicate.body).toMatchObject({ status: 'stale', revision: owned.revision + 1 })
+            const invalidCreationRevision = await postMockRpc(page, actor, rpc, {
+              want_owner: actor.user.id,
+              want_encounter: null,
+              expected_revision: 2,
+              want_writer: writer,
+              want_state: owned.state,
+              want_updated_at: owned.updated_at,
+            })
+            expect(invalidCreationRevision.body).toEqual({ status: 'stale', revision: 0 })
+            expect(backend.rows.get(actor.user.id)).toEqual(saved)
+          }
+        }
+        expect(
+          backend.targetMismatches.map((call) => [call.actor, call.body?.want_encounter]),
+        ).toEqual(rejectedTargets)
+        for (const actor of [first, second])
+          expect(
+            backend.calls.some(
+              (call) =>
+                call.actor === actor.user.id &&
+                call.path.endsWith('save_encounter_revision') &&
+                call.body?.want_encounter === null,
+            ),
+          ).toBe(true)
+        expect(backend.unexpected).toEqual([])
+      } finally {
+        await context.close()
+      }
+    },
+    30_000,
+  )
 
   it('serves /account directly with canonical query-preserving fallback and local compiled modules', async () => {
     const response = await fetchPreview(
@@ -360,6 +538,7 @@ describe.skipIf(!origin)('assembled account and console session boundary', () =>
       expect(await sdkBytes(page)).toBe(native)
       expect(backend.rows.get(session.user.id)!.state).toEqual(board)
       expect(backend.unexpected).toEqual([])
+      expect(backend.targetMismatches).toEqual([])
       expect(
         backend.calls
           .filter((call) => call.path.endsWith('save_encounter_revision'))
@@ -509,6 +688,7 @@ describe.skipIf(!origin)('assembled account and console session boundary', () =>
           true,
         )
         expect(backend.unexpected).toEqual([])
+        expect(backend.targetMismatches).toEqual([])
         expect(
           backend.calls
             .filter((call) => call.path.endsWith('save_encounter_revision'))
@@ -563,6 +743,7 @@ describe.skipIf(!origin)('assembled account and console session boundary', () =>
         expect(call.body).toEqual({})
       }
       expect(backend.unexpected).toEqual([])
+      expect(backend.targetMismatches).toEqual([])
     } finally {
       await context.close()
     }
@@ -603,6 +784,7 @@ describe.skipIf(!origin)('assembled account and console session boundary', () =>
           false,
         )
         expect(backend.unexpected).toEqual([])
+        expect(backend.targetMismatches).toEqual([])
       } finally {
         await context.close()
       }
@@ -624,6 +806,7 @@ describe.skipIf(!origin)('assembled account and console session boundary', () =>
       await consoleReady(page)
       await quickAdd(page, 'First owner private sentinel')
       await expect.poll(() => backend.rows.get(first.user.id)?.state.combatants.length).toBe(1)
+      const firstEncounterId = backend.rows.get(first.user.id)!.id
       const held = backend.hold('/rest/v1/rpc/save_encounter_revision')
       await quickAdd(page, 'First owner in-flight edit')
       await held.started
@@ -655,6 +838,25 @@ describe.skipIf(!origin)('assembled account and console session boundary', () =>
       const writes = backend.calls.filter((call) => call.path.endsWith('save_encounter_revision'))
       expect(writes.some((call) => call.actor === first.user.id)).toBe(true)
       expect(writes.some((call) => call.actor === replacement.user.id)).toBe(true)
+      const replacementEncounterId = backend.rows.get(replacement.user.id)!.id
+      expect(
+        writes
+          .filter((call) => call.actor === first.user.id)
+          .map((call) => call.body?.want_encounter),
+      ).toContain(firstEncounterId)
+      const replacementTargets = writes
+        .filter((call) => call.actor === replacement.user.id)
+        .map((call) => call.body?.want_encounter)
+      expect(replacementTargets).toContain(null)
+      expect(
+        replacementTargets.every((target) => target === null || target === replacementEncounterId),
+      ).toBe(true)
+      expect(replacementTargets).not.toContain(firstEncounterId)
+      expect(
+        backend.calls
+          .filter((call) => call.path.endsWith('claim_encounter_writer'))
+          .every((call) => call.body?.want_encounter === backend.rows.get(call.actor!)?.id),
+      ).toBe(true)
       expect(writes.every((call) => call.actor === call.body?.want_owner)).toBe(true)
       expect(
         writes
@@ -662,6 +864,7 @@ describe.skipIf(!origin)('assembled account and console session boundary', () =>
           .every((call) => !JSON.stringify(call.body?.want_state).includes('First owner')),
       ).toBe(true)
       expect(backend.unexpected).toEqual([])
+      expect(backend.targetMismatches).toEqual([])
     } finally {
       await context.close()
     }
@@ -738,6 +941,7 @@ describe.skipIf(!origin)('assembled account and console session boundary', () =>
             .filter((call) => call.path.endsWith('save_encounter_revision')),
         ).toEqual([])
         expect(backend.unexpected).toEqual([])
+        expect(backend.targetMismatches).toEqual([])
       } finally {
         await context.close()
       }
