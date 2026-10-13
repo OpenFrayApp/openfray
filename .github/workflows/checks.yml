@@ -63,9 +63,9 @@ jobs:
           path: |
             site/node_modules/.astro/assets
             handbook/node_modules/.astro/assets
-          key: astro-images-v1-${{ runner.os }}-${{ runner.arch }}-node24-${{ hashFiles('package-lock.json', 'site/astro.config.mjs', 'handbook/astro.config.mjs') }}-${{ github.sha }}
+          key: astro-images-v2-${{ runner.os }}-${{ runner.arch }}-node24-${{ hashFiles('package-lock.json', 'site/astro.config.mjs', 'handbook/astro.config.mjs') }}-${{ github.sha }}
           restore-keys: |
-            astro-images-v1-${{ runner.os }}-${{ runner.arch }}-node24-${{ hashFiles('package-lock.json', 'site/astro.config.mjs', 'handbook/astro.config.mjs') }}-
+            astro-images-v2-${{ runner.os }}-${{ runner.arch }}-node24-${{ hashFiles('package-lock.json', 'site/astro.config.mjs', 'handbook/astro.config.mjs') }}-
       - name: Record image-cache status
         env:
           CACHE_HIT: ${{ steps.astro-images.outputs.cache-hit }}
