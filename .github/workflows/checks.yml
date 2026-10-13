@@ -23,6 +23,8 @@ jobs:
       matrix:
         shard: [1, 2]
     steps:
+      - name: Intentional shard failure for aggregate-gate verification
+        run: test '${{ matrix.shard }}' != 1
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           submodules: recursive
@@ -43,16 +45,10 @@ jobs:
           include-hidden-files: true
           retention-days: 14
 
-  checks:
-    needs: node-tests
-    if: always()
+  validation:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Require every node-test shard to pass
-        env:
-          NODE_TEST_RESULT: ${{ needs.node-tests.result }}
-        run: test "$NODE_TEST_RESULT" = success
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           submodules: recursive
@@ -89,3 +85,15 @@ jobs:
       - run: npm run test:browser --workspace console
       - run: npm test --workspace site
       - run: npm test --workspace handbook
+
+  checks:
+    needs: [node-tests, validation]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Require every check to pass
+        env:
+          NODE_TEST_RESULT: ${{ needs.node-tests.result }}
+          VALIDATION_RESULT: ${{ needs.validation.result }}
+        run: test "$NODE_TEST_RESULT" = success && test "$VALIDATION_RESULT" = success
