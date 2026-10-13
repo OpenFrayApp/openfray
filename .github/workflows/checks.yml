@@ -15,10 +15,44 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  node-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Node tests (one worker per shard)
+        run: npm exec --workspace console -- vitest run --maxWorkers=1 --shard=${{ matrix.shard }}/2 --reporter=default --reporter=json --outputFile=.artifacts/ci/console-node.json
+      - name: Upload shard durations and inventory
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: console-node-shard-${{ matrix.shard }}-${{ github.run_attempt }}
+          path: console/.artifacts/ci/console-node.json
+          include-hidden-files: true
+          retention-days: 14
+
   checks:
+    needs: node-tests
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Require every node-test shard to pass
+        env:
+          NODE_TEST_RESULT: ${{ needs.node-tests.result }}
+        run: test "$NODE_TEST_RESULT" = success
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           submodules: recursive
@@ -52,16 +86,6 @@ jobs:
       - run: npx --no-install playwright install --with-deps chromium
       - run: npm run build
       - run: npx --no-install vitest run --maxWorkers=1
-      - name: Console node tests (one worker)
-        run: npm exec --workspace console -- vitest run --maxWorkers=1 --reporter=default --reporter=json --outputFile=.artifacts/ci/console-node.json
-      - name: Upload console node-test durations and inventory
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: console-node-${{ github.run_attempt }}
-          path: console/.artifacts/ci/console-node.json
-          include-hidden-files: true
-          retention-days: 14
       - run: npm run test:browser --workspace console
       - run: npm test --workspace site
       - run: npm test --workspace handbook
