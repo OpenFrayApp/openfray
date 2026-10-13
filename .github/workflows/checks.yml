@@ -28,11 +28,40 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Restore generated Astro images
+        id: astro-images
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            site/node_modules/.astro/assets
+            handbook/node_modules/.astro/assets
+          key: astro-images-v1-${{ runner.os }}-${{ runner.arch }}-node24-${{ hashFiles('package-lock.json', 'site/astro.config.mjs', 'handbook/astro.config.mjs') }}-${{ github.sha }}
+          restore-keys: |
+            astro-images-v1-${{ runner.os }}-${{ runner.arch }}-node24-${{ hashFiles('package-lock.json', 'site/astro.config.mjs', 'handbook/astro.config.mjs') }}-
+      - name: Record image-cache status
+        env:
+          CACHE_HIT: ${{ steps.astro-images.outputs.cache-hit }}
+        run: |
+          case "$CACHE_HIT" in
+            true) status=exact-hit ;;
+            false) status=compatible-restore ;;
+            *) status=miss ;;
+          esac
+          printf 'Astro image cache: %s\nRunner image: %s %s\n' "$status" "$ImageOS" "$ImageVersion" >> "$GITHUB_STEP_SUMMARY"
       - run: npm run typecheck
       - run: npx --no-install playwright install --with-deps chromium
       - run: npm run build
       - run: npx --no-install vitest run --maxWorkers=1
-      - run: npm exec --workspace console -- vitest run --maxWorkers=1
+      - name: Console node tests (one worker)
+        run: npm exec --workspace console -- vitest run --maxWorkers=1 --reporter=default --reporter=json --outputFile=.artifacts/ci/console-node.json
+      - name: Upload console node-test durations and inventory
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: console-node-${{ github.run_attempt }}
+          path: console/.artifacts/ci/console-node.json
+          include-hidden-files: true
+          retention-days: 14
       - run: npm run test:browser --workspace console
       - run: npm test --workspace site
       - run: npm test --workspace handbook
