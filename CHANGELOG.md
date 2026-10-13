@@ -25,7 +25,8 @@ Versions through 1.2.0 record the console’s release history.
 ### Changed
 
 - Site-owned sign-in, sign-up, and OAuth callback pages return to validated destinations while preserving console recovery copies. ([console#139](https://github.com/OpenFrayApp/console/issues/139))
-  Sign-in checkpoints preserve older recovery data without blocking a verified separate copy of the current board.
+  Sign-in and update checkpoints preserve older recovery data without blocking a verified separate copy of the current board.
+  Verified account navigation and updates avoid redundant browser exit warnings. Provider buttons retain their logos and colors.
   The site account page manages display names, default shared-encounter licenses, sign-out, and account deletion. **Profile** opens it after checkpointing the working board. ([console#140](https://github.com/OpenFrayApp/console/issues/140))
   Account integration remains under review and unreleased; handbook and publication checks remain pending. Newsletter subscriptions remain unavailable.
 - somanyrobots source tags use fuchsia to distinguish them from Core tags.
