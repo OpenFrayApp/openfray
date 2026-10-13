@@ -23,8 +23,6 @@ jobs:
       matrix:
         shard: [1, 2]
     steps:
-      - name: Intentional shard failure for aggregate-gate verification
-        run: test '${{ matrix.shard }}' != 1
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           submodules: recursive
