@@ -28,6 +28,7 @@ Versions through 1.2.0 record the console’s release history.
   Sign-in and update checkpoints preserve older recovery data without blocking a verified separate copy of the current board.
   Verified account navigation and updates avoid redundant browser exit warnings. Provider buttons retain their logos and colors.
   The account page groups the blue **Return to console →** button and red **Sign out** control.
+  The site navigation has a **Sign up** button. The sign-in and sign-up pages line up their secondary links in two columns.
   Sign-out and account deletion open the sign-in page after the local session is cleared.
   Successful account checks avoid flashing initialization text, and password guidance leaves the sign-in provider unspecified for linked accounts.
   The console’s account menu also offers **Sign out**, after verifying the working board’s recovery checkpoint.
